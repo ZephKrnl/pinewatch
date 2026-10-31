@@ -47,3 +47,14 @@ isn't set up. Each entry says what the Rust code does, where the behavior came f
   trailing group each become one U+FFFD. **Check:** generated inputs.
 - **V6. StreamReader buffer.** Byte order mark detection only sees the first 1024 bytes (`DefaultBufferSize`).
   **Check:** the buffer size in Unity's Mono, using files whose second kilobyte starts with a byte order mark.
+
+## `pinewatch-kvt`
+
+- **V7. List indexer message.** An out-of-range list index throws `ArgumentOutOfRangeException` with
+  `Index was out of range. Must be non-negative and less than the size of the collection.`, then `\nParameter name: index`.
+  **Check:** the text.
+- **V8. Null dictionary key.** `{` or `[` with no key before it makes `Dictionary.TryGetValue(null)` throw
+  `ArgumentNullException` for parameter `key`. **Check:** the type and text.
+- **V9. Hierarchy hash (later step).** `LevelHierarchy.load` hashes the bytes its `StreamReader` pulled through
+  `SHA1Stream`. If a stray root `}` ends reading early, the hash covers only the 1024-byte buffers read so far.
+  Not implemented in M1 (the level hash belongs to level loading). **Check:** when the level hash is ported.
