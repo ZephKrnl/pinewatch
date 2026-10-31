@@ -1,0 +1,13 @@
+[package]
+name = "pinewatch-level"
+description = "Readers for the original game's map files"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+pinewatch-mono.workspace = true
+pinewatch-io.workspace = true
+pinewatch-kvt.workspace = true
+sha1.workspace = true

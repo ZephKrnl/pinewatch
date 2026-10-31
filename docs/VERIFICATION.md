@@ -58,3 +58,23 @@ isn't set up. Each entry says what the Rust code does, where the behavior came f
 - **V9. Hierarchy hash (later step).** `LevelHierarchy.load` hashes the bytes its `StreamReader` pulled through
   `SHA1Stream`. If a stray root `}` ends reading early, the hash covers only the 1024-byte buffers read so far.
   Not implemented in M1 (the level hash belongs to level loading). **Check:** when the level hash is ported.
+
+## `pinewatch-level`
+
+- **V10. Hierarchy type resolution (gap).** `LevelHierarchy.read` resolves each `Type` with `Type.GetType` and creates
+  the C# object. M1 doesn't port that: every non-empty valid name counts as an existing type. So M1 never logs
+  `Level hierarchy item index N missing type: …` for names the real game doesn't know, though it still generates
+  instance IDs for them. **Fix:** a registry of the game's hierarchy item types (devkit objects step).
+- **V11. Level path string.** Messages use `<install root with \ separators, no trailing \>\Maps\<folder>`, followed by
+  `/Landscape/...`, as `Path.Combine` and `Directory.GetDirectories` build it. **Check:** the root string Unity reports
+  (`UnturnedPaths.RootDirectory.FullName`), including letter case.
+- **V12. I/O exception messages (gap).** A file that exists but fails to read becomes an `IOException` carrying Rust's
+  error text, not Mono's. **Fix:** map OS error codes to Mono's exception types and messages.
+- **V13. Culture-formatted numbers in messages (gap).** `LandscapeCoord.ToString()` and `UnturnedLog`'s
+  `string.Format` use the player's culture. M1 formats with the invariant culture, which only differs for negative
+  numbers in cultures with a different minus sign. **Fix:** culture support (`Culture` parameter, P5).
+- **V14. Holiday material redirects (later step).** When `Level.shouldUseHolidayRedirects` is on, `LandscapeTile.read`
+  swaps material references for their holiday versions. M1 doesn't use materials yet. **Fix:** port this with the
+  M2 asset system.
+- **V15. More than 8 materials.** `materials[layer] = …` on the 8-slot `InspectableList` is assumed to throw
+  `List<T>`'s `ArgumentOutOfRangeException`. **Check:** `InspectableList`'s indexer.
