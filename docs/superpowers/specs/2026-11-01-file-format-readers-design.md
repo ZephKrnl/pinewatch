@@ -221,6 +221,9 @@ C:\Pinewatch
 
 Pinewatch is a Mod under the U3 SDK License Agreement, so the repository follows that agreement (section 1). The repository sets `core.longpaths true`.
 
+A `.gitattributes` file turns off line-ending conversion for test fixtures and generated tables, so their bytes are
+stored exactly. Git for Windows converts line endings by default, which would change byte-exact test inputs.
+
 Git is local only:
 - The repository has no remotes, and nothing is ever pushed.
 - All git settings are local to `C:\Pinewatch`, with commits authored as Zeph.
