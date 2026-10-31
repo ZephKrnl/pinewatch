@@ -1,2 +1,14 @@
 # Personal Claude Code settings for this machine
 .claude/settings.local.json
+
+# Build output
+/target
+
+# Local copies of game files and outputs derived from them (never committed)
+/testdata
+
+# Unity working copy and cache for the reference harness
+/reference/work
+
+# Execution ledgers for implementation plans
+/.superpowers/

@@ -1,0 +1,3 @@
+[submodule "reference/u3-sdk"]
+	path = reference/u3-sdk
+	url = https://github.com/SmartlyDressedGames/U3-SDK.git

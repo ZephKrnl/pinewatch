@@ -1,0 +1,13 @@
+# Normalize ordinary text files.
+* text=auto
+*.rs text
+*.toml text
+*.md text
+
+# Byte-exact files: never convert line endings.
+# Test fixtures and generated tables must keep their exact bytes for 1:1 tests.
+crates/**/tests/fixtures/** -text
+*.bin -text
+# License files are byte copies of the SDK's files.
+LICENSE.txt -text
+THIRDPARTYNOTICES.txt -text
