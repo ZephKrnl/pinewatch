@@ -80,7 +80,7 @@ fn boxed_array<T: Clone, const N: usize>(value: T) -> Box<[T; N]> {
 
 impl LandscapeTile {
     /// The `LandscapeTile` constructor's defaults: heights 0.5, layer 0 fully painted, no holes, Fallback_Green first.
-    fn new(coord: LandscapeCoord) -> Self {
+    pub fn new(coord: LandscapeCoord) -> Self {
         let mut first_layer = [0.0f32; SPLATMAP_LAYERS];
         first_layer[0] = 1.0;
         let mut materials = vec![Guid::EMPTY; SPLATMAP_LAYERS];
