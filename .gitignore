@@ -1,8 +1,8 @@
 # Personal Claude Code settings for this machine
 .claude/settings.local.json
 
-# Build output
-/target
+# Build output, at any depth (cargo can create target/ folders inside crates)
+target/
 
 # Local copies of game files and outputs derived from them (never committed)
 /testdata
