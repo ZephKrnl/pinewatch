@@ -1,8 +1,13 @@
 //! `DebugDumpToString` (UnturnedDat/DatNodeEx.cs) and the `DebugDumpToStringBuilder` methods of `DatDictionary`,
-//! `DatList` and `DatValue`. Game code puts these dumps in log messages.
+//! `DatList`, `DatValue` and `DatComment`. Game code puts these dumps in log messages.
+//!
+//! A node parsed with metadata dumps through its underlying plain node, whose own line numbers and inline comment
+//! are never set. So a dump never shows line numbers or inline comments, only the prefix comments of the children,
+//! which the plain dictionary and list ask their children (the metadata wrappers) for.
 
 use pinewatch_mono::{NEW_LINE, NetString};
 
+use crate::comment::DatComment;
 use crate::tree::{DictRef, ListRef, NodeRef, ValueRef};
 
 const TAB: u16 = b'\t' as u16;
@@ -32,6 +37,9 @@ fn dump_dictionary(dictionary: DictRef<'_>, output: &mut Vec<u16>, indentation_l
     append(output, "{");
     append(output, NEW_LINE);
     for (key, node) in dictionary.iter() {
+        if let Some(comment) = node.parsed_comment() {
+            dump_comment(comment, output, indentation_level);
+        }
         tabs(output, indentation_level + 1);
         output.push(QUOTE);
         output.extend_from_slice(key.as_units());
@@ -49,6 +57,9 @@ fn dump_list(list: ListRef<'_>, output: &mut Vec<u16>, indentation_level: usize)
     append(output, "[");
     append(output, NEW_LINE);
     for (index, item) in list.iter().enumerate() {
+        if let Some(comment) = item.parsed_comment() {
+            dump_comment(comment, output, indentation_level);
+        }
         tabs(output, indentation_level + 1);
         append(output, &index.to_string());
         append(output, " = ");
@@ -70,6 +81,22 @@ fn dump_value(value: ValueRef<'_>, output: &mut Vec<u16>) {
         None => append(output, "value(null)"),
     }
     append(output, NEW_LINE);
+}
+
+/// `DatComment.DebugDumpToStringBuilder`: each line one tab deeper than `indentation_level`, after `// `, or `//`
+/// alone for an empty line.
+fn dump_comment(comment: &DatComment, output: &mut Vec<u16>, indentation_level: usize) {
+    for line in &comment.message_lines {
+        tabs(output, indentation_level + 1);
+        match line.as_ref().filter(|line| !line.is_empty()) {
+            Some(line) => {
+                append(output, "// ");
+                output.extend_from_slice(line.as_units());
+            }
+            None => append(output, "//"),
+        }
+        append(output, NEW_LINE);
+    }
 }
 
 fn append(output: &mut Vec<u16>, text: &str) {

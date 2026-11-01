@@ -4,11 +4,13 @@
 //! `UnturnedDat.dll`. Behaviors that neither that assembly's IL nor a ported NUnit case confirms are listed in
 //! `docs/VERIFICATION.md`.
 
+mod comment;
 mod dump;
 mod parser;
 mod tokenizer;
 mod tree;
 
+pub use comment::DatComment;
 pub use parser::DatParser;
 pub use tokenizer::{DatToken, DatTokenType, DatTokenizer};
 pub use tree::{DatNodeType, DatTree, DictRef, ListRef, NodeId, NodeRef, ValueRef};
