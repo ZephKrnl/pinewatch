@@ -126,6 +126,14 @@ isn't set up. Each entry says what the Rust code does, where the behavior came f
   `List<T>`'s `ArgumentOutOfRangeException` (`Index was out of range. …` + NewLine + `Parameter name: index`).
   **Check:** `InspectableList`'s indexer.
 
+## `pinewatch-dat`
+
+- **V17. Keys that differ only by case (gap).** `DatDictionary` uses `StringComparer.OrdinalIgnoreCase`. Pinewatch
+  treats two keys as equal when every code unit matches after `ToUpperInvariant`, and above ASCII that mapping comes
+  from Rust's Unicode tables, not Mono's (V3). Equal keys merge: the first spelling stays and the last value wins,
+  with a `duplicate key` error. **Check:** non-ASCII key pairs that differ only by case merge, or stay apart, exactly
+  as in the game. That depends on both `Equals` and `GetHashCode` of Mono's `OrdinalIgnoreCase` comparer.
+
 ## Settled without the harness
 
 Settled 2026-11-01 from the compiled source and the shipped `mscorlib.dll` (V0):
