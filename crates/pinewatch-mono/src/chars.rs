@@ -43,6 +43,19 @@ pub fn to_upper_invariant(c: u16) -> u16 {
     }
 }
 
+/// `StringComparison.OrdinalIgnoreCase` equality: the same length, and every code unit equal after
+/// `ToUpperInvariant`.
+pub fn equals_ordinal_ignore_case(a: &[u16], b: &[u16]) -> bool {
+    a.len() == b.len() && a.iter().zip(b).all(|(&x, &y)| x == y || to_upper_invariant(x) == to_upper_invariant(y))
+}
+
+/// `string.Trim()` and `ReadOnlySpan<char>.Trim()`: removes `char.IsWhiteSpace` characters from both ends.
+pub fn trim(s: &[u16]) -> &[u16] {
+    let start = s.iter().position(|&c| !is_white_space(c)).unwrap_or(s.len());
+    let end = s.iter().rposition(|&c| !is_white_space(c)).map_or(start, |i| i + 1);
+    &s[start..end.max(start)]
+}
+
 fn single_unit(mapped: Option<impl Iterator<Item = char>>) -> Option<u16> {
     let mut mapped = mapped?;
     let first = mapped.next()?;

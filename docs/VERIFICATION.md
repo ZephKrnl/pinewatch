@@ -86,6 +86,12 @@ isn't set up. Each entry says what the Rust code does, where the behavior came f
   value is rounded once to 53 bits, and `float` is the cast of that `double`. NaN has the C# constants' bits.
   **Check:** a harness sweep of generated decimals near rounding boundaries, long digit strings and denormals.
 
+- **V18. Enum member order.** `Enum.TryParse` matches names in the order `GetCachedValuesAndNames` returns: Mono's
+  declaration order, sorted by value with `Array.Sort` when the values don't ascend. `Array.Sort` is an introsort,
+  stable up to 16 members but not above. Pinewatch sorts stably. The order only matters for names that differ only
+  by letter case, parsed with `ignoreCase`. **Check:** when each game enum is ported, confirm no two of its names are
+  equal ignoring case; if one is, dump its member order with the harness.
+
 ## `pinewatch-kvt`
 
 - **V9. Hierarchy hash (later step).** `LevelHierarchy.load` hashes the bytes its `StreamReader` pulled through

@@ -144,6 +144,31 @@ fn x_format_byte_over_255_is_a_format_exception() {
 }
 
 #[test]
+fn try_parse_never_fails_with_an_exception() {
+    let try_parse = |s: &str| Guid::try_parse(Some(&NetString::from_str(s)));
+    for valid in [
+        N,
+        "53d3ea4a-555c-44d1-824b-495c2b337aec",
+        "{53d3ea4a-555c-44d1-824b-495c2b337aec}",
+        "(53d3ea4a-555c-44d1-824b-495c2b337aec)",
+        "{0x53d3ea4a,0x555c,0x44d1,{0x82,0x4b,0x49,0x5c,0x2b,0x33,0x7a,0xec}}",
+    ] {
+        assert_eq!(try_parse(valid).map(|g| *g.as_bytes()), Some(BYTES), "{valid}");
+    }
+    for invalid in [
+        "0",
+        "",
+        "   ",
+        "{-3d3ea4a-555c-44d1-824b-495c2b337aec}",
+        "{0x123456789,0x0,0x0,{0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0}}",
+        "g0000000-0000-0000-0000-000000000000",
+    ] {
+        assert_eq!(try_parse(invalid), None, "{invalid}");
+    }
+    assert_eq!(Guid::try_parse(None), None);
+}
+
+#[test]
 fn x_format_structure_errors() {
     // The hex-prefix message keeps its "{0}": Guid passes the argument with ParseFailureKind.Format.
     assert_eq!(parse_err("{1x0,0x0,0x0,{0x0}}"), format(sr::FORMAT_GUID_HEX_PREFIX));

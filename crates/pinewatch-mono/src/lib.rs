@@ -4,7 +4,9 @@
 //! at the commits Unity's Mono pins, plus a few reference-source and Mono files (`docs/VERIFICATION.md`, V0).
 //! Behaviors that the Unity reference harness has not confirmed yet are listed in `docs/VERIFICATION.md`.
 
+mod boolean;
 pub mod chars;
+mod enums;
 mod exception;
 mod guid;
 mod net_string;
@@ -14,6 +16,8 @@ mod parse_numbers;
 pub mod sr;
 mod text;
 
+pub use boolean::try_parse_bool;
+pub use enums::{EnumInfo, EnumUnderlying, NetEnum, try_parse_enum};
 pub use exception::{ExceptionKind, MonoException, NEW_LINE};
 pub use guid::Guid;
 pub use net_string::NetString;

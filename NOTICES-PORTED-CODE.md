@@ -21,6 +21,7 @@ Ported from `mono/corefx` at `5b4edb9b0a721aed60c9c8ddeed441bdd7451e42` and `mon
 | `crates/pinewatch-mono/src/text.rs` | corefx `IO/StreamReader.cs`, `Text/UTF8Encoding.cs`, `Text/UnicodeEncoding.cs`, `Text/UTF32Encoding.cs` |
 | `crates/pinewatch-mono/src/exception.rs` | corefx `ArgumentException.cs` (`Message`) and the exception classes' default messages |
 | `crates/pinewatch-mono/src/chars.rs` | corefx `Char.cs` (`IsWhiteSpaceLatin1`) |
+| `crates/pinewatch-mono/src/boolean.rs` | corefx `Boolean.cs` (`TryParse`, `TrimWhiteSpaceAndNull`) |
 | `crates/pinewatch-mono/src/sr.rs` | corefx resource strings, as Mono's `mcs/class/corlib/corefx/SR.cs` carries them |
 
 ```
@@ -57,6 +58,7 @@ Ported from `mcs/class/referencesource` in Unity's Mono at `b8eb56fab45dd52845fa
 |---|---|
 | `crates/pinewatch-mono/src/number.rs` | `NumberFormatInfo.ValidateParseStyleInteger` and `ValidateParseStyleFloatingPoint` in `mscorlib/system/globalization/numberformatinfo.cs` |
 | `crates/pinewatch-mono/src/sr.rs` | reference-source resource strings, as Mono's `mcs/class/corlib/ReferenceSources/SR.cs` carries them |
+| `crates/pinewatch-mono/src/enums.rs` | `Enum.TryParse` and `TryParseEnum` in `mscorlib/system/enum.cs` |
 
 ```
 The MIT License (MIT)

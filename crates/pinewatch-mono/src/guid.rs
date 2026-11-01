@@ -52,6 +52,13 @@ impl Guid {
     pub fn parse(g: &NetString) -> Result<Guid, MonoException> {
         try_parse_guid(g.as_units())
     }
+
+    /// `Guid.TryParse(string input, out Guid result)`: `TryParseGuid` with `GuidParseThrowStyle.None`. Every
+    /// failure there returns right after recording it, and exceptions from `ParseNumbers` are caught, so it succeeds
+    /// exactly when `new Guid(input)` does, with the same value. A missing string fails.
+    pub fn try_parse(input: Option<&NetString>) -> Option<Guid> {
+        try_parse_guid(input?.as_units()).ok()
+    }
 }
 
 /// `GuidResult.SetFailure(ParseFailureKind.Format, message)`: `new FormatException(message)`.
