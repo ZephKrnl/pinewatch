@@ -1,9 +1,10 @@
 // Ported from corert `src/System.Private.CoreLib/shared/System/Number.Parsing.cs` (mono/corert 11136ad5), corefx
-// `Int32.cs` and `UInt32.cs` (mono/corefx 5b4edb9b): Copyright (c) .NET Foundation and Contributors.
+// `SByte.cs`, `Byte.cs`, `Int16.cs`, `UInt16.cs`, `Int32.cs`, `UInt32.cs`, `Int64.cs` and `UInt64.cs`
+// (mono/corefx 5b4edb9b): Copyright (c) .NET Foundation and Contributors.
 // `NumberFormatInfo.ValidateParseStyleInteger` from reference source `numberformatinfo.cs`: Copyright (c) Microsoft
 // Corporation. MIT license; see NOTICES-PORTED-CODE.md.
 
-//! Integer parsing: `Int32.TryParse` and `UInt32.TryParse` with a style and a format provider.
+//! Integer parsing: `TryParse` with a style and a format provider for every integer width.
 //!
 //! As in corert, styles within `NumberStyles.Integer` take an optimized path, hexadecimal styles take their own,
 //! and everything else goes through the `ParseNumber` state machine. A C# `char*` walk reads `'\0'` past the
@@ -90,6 +91,8 @@ impl NumberFormat {
 const NUMBER_MAX_DIGITS: i32 = 50;
 const INT32_PRECISION: i32 = 10;
 const UINT32_PRECISION: i32 = INT32_PRECISION;
+const INT64_PRECISION: i32 = 19;
+const UINT64_PRECISION: i32 = 20;
 
 /// `Number.NumberBuffer`: digits are kept without the C# NUL terminator.
 #[derive(Debug, Default)]
@@ -421,6 +424,66 @@ fn number_to_u32(number: &NumberBuffer) -> Option<u32> {
     Some(n)
 }
 
+/// `Number.NumberToInt64`.
+fn number_to_i64(number: &NumberBuffer) -> Option<i64> {
+    let mut i = number.scale;
+    if i > INT64_PRECISION || i < number.precision {
+        return None;
+    }
+    let mut digits = number.digits.iter();
+    let mut n: i64 = 0;
+    loop {
+        i -= 1;
+        if i < 0 {
+            break;
+        }
+        if (n as u64) > (0x7FFF_FFFF_FFFF_FFFF / 10) {
+            return None;
+        }
+        n = n.wrapping_mul(10);
+        if let Some(&d) = digits.next() {
+            n = n.wrapping_add(i64::from(digit_value(d)));
+        }
+    }
+    if number.sign {
+        n = n.wrapping_neg();
+        if n > 0 {
+            return None;
+        }
+    } else if n < 0 {
+        return None;
+    }
+    Some(n)
+}
+
+/// `Number.NumberToUInt64`.
+fn number_to_u64(number: &NumberBuffer) -> Option<u64> {
+    let mut i = number.scale;
+    if i > UINT64_PRECISION || i < number.precision || number.sign {
+        return None;
+    }
+    let mut digits = number.digits.iter();
+    let mut n: u64 = 0;
+    loop {
+        i -= 1;
+        if i < 0 {
+            break;
+        }
+        if n > (u64::MAX / 10) {
+            return None;
+        }
+        n = n.wrapping_mul(10);
+        if let Some(&d) = digits.next() {
+            let new_n = n.wrapping_add(u64::from(digit_value(d)));
+            if new_n < n {
+                return None;
+            }
+            n = new_n;
+        }
+    }
+    Some(n)
+}
+
 /// Where the integer-style parsers end up: `DoneAtEndButPotentialOverflow` or `FalseExit`. Overflow is a failure
 /// for `TryParse` either way; `Parse` would turn it into an `OverflowException` instead of a `FormatException`.
 enum IntegerParse {
@@ -504,10 +567,16 @@ fn integer_style_trailing(value: &[u16], mut index: usize, styles: NumberStyles)
     if trailing_zeros(value, index) { IntegerParse::Done } else { IntegerParse::False }
 }
 
-/// Decimal digits for the integer-style parsers: skips leading zeros, then reads up to 10 significant digits.
-/// Returns the low 32 bits of the value, the 10th digit if there was one (for the caller's overflow check), and
-/// whether more digits followed; `None` from the outer option is `FalseExit` (no digit at all).
-fn integer_style_digits(value: &[u16], mut index: usize, styles: NumberStyles) -> Option<(u32, Option<u16>, bool, IntegerParse)> {
+/// Decimal digits for the integer-style parsers: skips leading zeros, then reads the `safe_digits` significant digits
+/// that can't overflow (9 for 32 bits, 18 for `Int64`, 19 for `UInt64`). Returns their value (C#'s wrapping
+/// arithmetic, so the bits match for every width), the next digit if there is one (for the caller's overflow check),
+/// and whether more digits follow. `None` is `FalseExit`: no digit at all.
+fn integer_style_digits(
+    value: &[u16],
+    mut index: usize,
+    styles: NumberStyles,
+    safe_digits: usize,
+) -> Option<(u64, Option<u16>, bool, IntegerParse)> {
     let mut num = value[index];
     if !is_digit(num) {
         return None;
@@ -529,10 +598,10 @@ fn integer_style_digits(value: &[u16], mut index: usize, styles: NumberStyles) -
         }
     }
 
-    // Up to 9 digits can't overflow.
-    let mut answer = u32::from(num - u16::from(b'0'));
+    // The first `safe_digits` digits can't overflow.
+    let mut answer = u64::from(num - u16::from(b'0'));
     index += 1;
-    for _ in 0..8 {
+    for _ in 1..safe_digits {
         if index >= value.len() {
             return Some((answer, None, false, IntegerParse::Done));
         }
@@ -541,10 +610,10 @@ fn integer_style_digits(value: &[u16], mut index: usize, styles: NumberStyles) -
             return Some((answer, None, false, integer_style_trailing(value, index, styles)));
         }
         index += 1;
-        answer = answer.wrapping_mul(10).wrapping_add(u32::from(num - u16::from(b'0')));
+        answer = answer.wrapping_mul(10).wrapping_add(u64::from(num - u16::from(b'0')));
     }
 
-    // The 10th digit may overflow; the caller checks.
+    // The next digit may overflow; the caller checks.
     if index >= value.len() {
         return Some((answer, None, false, IntegerParse::Done));
     }
@@ -553,9 +622,9 @@ fn integer_style_digits(value: &[u16], mut index: usize, styles: NumberStyles) -
         return Some((answer, None, false, integer_style_trailing(value, index, styles)));
     }
     index += 1;
-    let tenth = num;
+    let last = num;
     if index >= value.len() {
-        return Some((answer, Some(tenth), false, IntegerParse::Done));
+        return Some((answer, Some(last), false, IntegerParse::Done));
     }
 
     // Any further digit overflows, but format errors take precedence for compatibility.
@@ -565,26 +634,26 @@ fn integer_style_digits(value: &[u16], mut index: usize, styles: NumberStyles) -
         more = true;
         index += 1;
         if index >= value.len() {
-            return Some((answer, Some(tenth), more, IntegerParse::Done));
+            return Some((answer, Some(last), more, IntegerParse::Done));
         }
         num = value[index];
     }
-    Some((answer, Some(tenth), more, integer_style_trailing(value, index, styles)))
+    Some((answer, Some(last), more, integer_style_trailing(value, index, styles)))
 }
 
 /// `Number.TryParseInt32IntegerStyle`.
 fn try_parse_int32_integer_style(value: &[u16], styles: NumberStyles, info: &NumberFormat) -> Option<i32> {
     let (value, index, negative) = integer_style_prefix(value, styles, info)?;
     let sign: i32 = if negative { -1 } else { 1 };
-    let (nine_digits, tenth, more, end) = integer_style_digits(value, index, styles)?;
+    let (safe, last, more, end) = integer_style_digits(value, index, styles, 9)?;
 
     let mut overflow = more;
-    let mut answer = nine_digits as i32;
-    if let Some(tenth) = tenth {
+    let mut answer = safe as i32;
+    if let Some(last) = last {
         if answer > i32::MAX / 10 {
             overflow = true;
         }
-        answer = answer.wrapping_mul(10).wrapping_add(i32::from(tenth - u16::from(b'0')));
+        answer = answer.wrapping_mul(10).wrapping_add(i32::from(last - u16::from(b'0')));
         // (uint)answer > (uint)int.MaxValue + (-1 * sign + 1) / 2
         if answer as u32 > (i32::MAX as u32).wrapping_add(((-sign + 1) / 2) as u32) {
             overflow = true;
@@ -599,15 +668,15 @@ fn try_parse_int32_integer_style(value: &[u16], styles: NumberStyles, info: &Num
 /// `Number.TryParseUInt32IntegerStyle`.
 fn try_parse_uint32_integer_style(value: &[u16], styles: NumberStyles, info: &NumberFormat) -> Option<u32> {
     let (value, index, has_negative_sign) = integer_style_prefix(value, styles, info)?;
-    let (nine_digits, tenth, more, end) = integer_style_digits(value, index, styles)?;
+    let (safe, last, more, end) = integer_style_digits(value, index, styles, 9)?;
 
     let mut overflow = more;
-    let mut answer = nine_digits;
-    if let Some(tenth) = tenth {
-        if answer > u32::MAX / 10 || (answer == u32::MAX / 10 && tenth > u16::from(b'5')) {
+    let mut answer = safe as u32;
+    if let Some(last) = last {
+        if answer > u32::MAX / 10 || (answer == u32::MAX / 10 && last > u16::from(b'5')) {
             overflow = true;
         }
-        answer = answer.wrapping_mul(10).wrapping_add(u32::from(tenth - u16::from(b'0')));
+        answer = answer.wrapping_mul(10).wrapping_add(u32::from(last - u16::from(b'0')));
     }
     match end {
         // A negative sign is only allowed on zero.
@@ -616,18 +685,63 @@ fn try_parse_uint32_integer_style(value: &[u16], styles: NumberStyles, info: &Nu
     }
 }
 
-/// `s_charToHexLookup[num]` for `num` below 256: the value of an ASCII hex digit.
-fn hex_value(num: u16) -> Option<u32> {
-    match num {
-        0x30..=0x39 => Some(u32::from(num - 0x30)),
-        0x41..=0x46 => Some(u32::from(num - 0x41) + 10),
-        0x61..=0x66 => Some(u32::from(num - 0x61) + 10),
+/// `Number.TryParseInt64IntegerStyle`.
+fn try_parse_int64_integer_style(value: &[u16], styles: NumberStyles, info: &NumberFormat) -> Option<i64> {
+    let (value, index, negative) = integer_style_prefix(value, styles, info)?;
+    let sign: i64 = if negative { -1 } else { 1 };
+    let (safe, last, more, end) = integer_style_digits(value, index, styles, 18)?;
+
+    let mut overflow = more;
+    let mut answer = safe as i64;
+    if let Some(last) = last {
+        if answer > i64::MAX / 10 {
+            overflow = true;
+        }
+        answer = answer.wrapping_mul(10).wrapping_add(i64::from(last - u16::from(b'0')));
+        // (ulong)answer > (ulong)long.MaxValue + (ulong)((-1 * sign + 1) / 2)
+        if answer as u64 > (i64::MAX as u64).wrapping_add(((-sign + 1) / 2) as u64) {
+            overflow = true;
+        }
+    }
+    match end {
+        IntegerParse::Done if !overflow => Some(answer.wrapping_mul(sign)),
         _ => None,
     }
 }
 
-/// `Number.TryParseUInt32HexNumberStyle`.
-fn try_parse_uint32_hex_number_style(value: &[u16], styles: NumberStyles) -> Option<u32> {
+/// `Number.TryParseUInt64IntegerStyle`. C# accumulates in a `long` that wraps; `u64` wrapping arithmetic gives the
+/// same bits.
+fn try_parse_uint64_integer_style(value: &[u16], styles: NumberStyles, info: &NumberFormat) -> Option<u64> {
+    let (value, index, has_negative_sign) = integer_style_prefix(value, styles, info)?;
+    let (safe, last, more, end) = integer_style_digits(value, index, styles, 19)?;
+
+    let mut overflow = more;
+    let mut answer = safe;
+    if let Some(last) = last {
+        if answer > u64::MAX / 10 || (answer == u64::MAX / 10 && last > u16::from(b'5')) {
+            overflow = true;
+        }
+        answer = answer.wrapping_mul(10).wrapping_add(u64::from(last - u16::from(b'0')));
+    }
+    match end {
+        IntegerParse::Done if !overflow && !(has_negative_sign && answer != 0) => Some(answer),
+        _ => None,
+    }
+}
+
+/// `s_charToHexLookup[num]` for `num` below 256: the value of an ASCII hex digit.
+fn hex_value(num: u16) -> Option<u64> {
+    match num {
+        0x30..=0x39 => Some(u64::from(num - 0x30)),
+        0x41..=0x46 => Some(u64::from(num - 0x41) + 10),
+        0x61..=0x66 => Some(u64::from(num - 0x61) + 10),
+        _ => None,
+    }
+}
+
+/// `Number.TryParseUInt32HexNumberStyle` (`max_digits` 8) and `TryParseUInt64HexNumberStyle` (`max_digits` 16):
+/// that many significant hex digits fit, one more is an overflow.
+fn hex_number_style(value: &[u16], styles: NumberStyles, max_digits: usize) -> Option<u64> {
     if value.is_empty() {
         return None;
     }
@@ -650,7 +764,7 @@ fn try_parse_uint32_hex_number_style(value: &[u16], styles: NumberStyles) -> Opt
     // Not a hex digit: FalseExit.
     hex_value(num)?;
     let mut overflow = false;
-    let mut answer: u32 = 0;
+    let mut answer: u64 = 0;
     let end = 'digits: {
         // Skip past leading zeros.
         if num == u16::from(b'0') {
@@ -670,10 +784,10 @@ fn try_parse_uint32_hex_number_style(value: &[u16], styles: NumberStyles) -> Opt
             break 'digits integer_style_trailing(value, index, styles);
         };
 
-        // Up to 8 digits can't overflow.
+        // Up to `max_digits` digits can't overflow.
         answer = first_digit;
         index += 1;
-        for _ in 0..7 {
+        for _ in 1..max_digits {
             if index >= value.len() {
                 return Some(answer);
             }
@@ -723,7 +837,7 @@ fn number_try_parse_int32(value: &[u16], styles: NumberStyles, info: &NumberForm
         return try_parse_int32_integer_style(value, styles, info);
     }
     if styles.has(NumberStyles::ALLOW_HEX_SPECIFIER) {
-        return try_parse_uint32_hex_number_style(value, styles).map(|v| v as i32);
+        return hex_number_style(value, styles, 8).map(|v| v as u32 as i32);
     }
     number_to_i32(&try_string_to_number(value, styles, info, false)?)
 }
@@ -734,9 +848,31 @@ fn number_try_parse_uint32(value: &[u16], styles: NumberStyles, info: &NumberFor
         return try_parse_uint32_integer_style(value, styles, info);
     }
     if styles.has(NumberStyles::ALLOW_HEX_SPECIFIER) {
-        return try_parse_uint32_hex_number_style(value, styles);
+        return hex_number_style(value, styles, 8).map(|v| v as u32);
     }
     number_to_u32(&try_string_to_number(value, styles, info, false)?)
+}
+
+/// `Number.TryParseInt64`.
+fn number_try_parse_int64(value: &[u16], styles: NumberStyles, info: &NumberFormat) -> Option<i64> {
+    if styles.bits() & !NumberStyles::INTEGER.bits() == 0 {
+        return try_parse_int64_integer_style(value, styles, info);
+    }
+    if styles.has(NumberStyles::ALLOW_HEX_SPECIFIER) {
+        return hex_number_style(value, styles, 16).map(|v| v as i64);
+    }
+    number_to_i64(&try_string_to_number(value, styles, info, false)?)
+}
+
+/// `Number.TryParseUInt64`.
+fn number_try_parse_uint64(value: &[u16], styles: NumberStyles, info: &NumberFormat) -> Option<u64> {
+    if styles.bits() & !NumberStyles::INTEGER.bits() == 0 {
+        return try_parse_uint64_integer_style(value, styles, info);
+    }
+    if styles.has(NumberStyles::ALLOW_HEX_SPECIFIER) {
+        return hex_number_style(value, styles, 16);
+    }
+    number_to_u64(&try_string_to_number(value, styles, info, false)?)
 }
 
 /// `NumberFormatInfo.ValidateParseStyleInteger` (reference source).
@@ -762,4 +898,53 @@ pub fn try_parse_i32(s: Option<&NetString>, style: NumberStyles, info: &NumberFo
 pub fn try_parse_u32(s: Option<&NetString>, style: NumberStyles, info: &NumberFormat) -> Result<Option<u32>, MonoException> {
     validate_parse_style_integer(style)?;
     Ok(s.and_then(|s| number_try_parse_uint32(s.as_units(), style, info)))
+}
+
+/// `SByte.TryParse(string, NumberStyles, IFormatProvider, out sbyte)`: `Number.TryParseInt32`, then a range check. A
+/// hexadecimal value must be 0 to 255 and keeps its bits, so `"80"` is -128.
+pub fn try_parse_i8(s: Option<&NetString>, style: NumberStyles, info: &NumberFormat) -> Result<Option<i8>, MonoException> {
+    validate_parse_style_integer(style)?;
+    Ok(s.and_then(|s| number_try_parse_int32(s.as_units(), style, info)).and_then(|i| {
+        if style.has(NumberStyles::ALLOW_HEX_SPECIFIER) {
+            (0..=i32::from(u8::MAX)).contains(&i).then_some(i as i8)
+        } else {
+            i8::try_from(i).ok()
+        }
+    }))
+}
+
+/// `Byte.TryParse`: `Number.TryParseInt32`, then 0 to 255.
+pub fn try_parse_u8(s: Option<&NetString>, style: NumberStyles, info: &NumberFormat) -> Result<Option<u8>, MonoException> {
+    validate_parse_style_integer(style)?;
+    Ok(s.and_then(|s| number_try_parse_int32(s.as_units(), style, info)).and_then(|i| u8::try_from(i).ok()))
+}
+
+/// `Int16.TryParse`: like `SByte`, with a 0 to 65535 hexadecimal range.
+pub fn try_parse_i16(s: Option<&NetString>, style: NumberStyles, info: &NumberFormat) -> Result<Option<i16>, MonoException> {
+    validate_parse_style_integer(style)?;
+    Ok(s.and_then(|s| number_try_parse_int32(s.as_units(), style, info)).and_then(|i| {
+        if style.has(NumberStyles::ALLOW_HEX_SPECIFIER) {
+            (0..=i32::from(u16::MAX)).contains(&i).then_some(i as i16)
+        } else {
+            i16::try_from(i).ok()
+        }
+    }))
+}
+
+/// `UInt16.TryParse`: `Number.TryParseUInt32` (not `Int32`), then 0 to 65535.
+pub fn try_parse_u16(s: Option<&NetString>, style: NumberStyles, info: &NumberFormat) -> Result<Option<u16>, MonoException> {
+    validate_parse_style_integer(style)?;
+    Ok(s.and_then(|s| number_try_parse_uint32(s.as_units(), style, info)).and_then(|i| u16::try_from(i).ok()))
+}
+
+/// `Int64.TryParse(string s, NumberStyles style, IFormatProvider provider, out long result)`.
+pub fn try_parse_i64(s: Option<&NetString>, style: NumberStyles, info: &NumberFormat) -> Result<Option<i64>, MonoException> {
+    validate_parse_style_integer(style)?;
+    Ok(s.and_then(|s| number_try_parse_int64(s.as_units(), style, info)))
+}
+
+/// `UInt64.TryParse(string s, NumberStyles style, IFormatProvider provider, out ulong result)`.
+pub fn try_parse_u64(s: Option<&NetString>, style: NumberStyles, info: &NumberFormat) -> Result<Option<u64>, MonoException> {
+    validate_parse_style_integer(style)?;
+    Ok(s.and_then(|s| number_try_parse_uint64(s.as_units(), style, info)))
 }

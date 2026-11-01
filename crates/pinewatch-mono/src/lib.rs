@@ -16,5 +16,8 @@ mod text;
 pub use exception::{ExceptionKind, MonoException, NEW_LINE};
 pub use guid::Guid;
 pub use net_string::NetString;
-pub use number::{NumberFormat, NumberStyles, try_parse_i32, try_parse_u32};
+pub use number::{
+    NumberFormat, NumberStyles, try_parse_i8, try_parse_i16, try_parse_i32, try_parse_i64, try_parse_u8, try_parse_u16,
+    try_parse_u32, try_parse_u64,
+};
 pub use text::decode_stream_reader_default;

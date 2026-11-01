@@ -16,7 +16,7 @@ Ported from `mono/corefx` at `5b4edb9b0a721aed60c9c8ddeed441bdd7451e42` and `mon
 |---|---|
 | `crates/pinewatch-mono/src/parse_numbers.rs` | corefx `src/Common/src/CoreLib/System/ParseNumbers.cs` |
 | `crates/pinewatch-mono/src/guid.rs` | corefx `src/Common/src/CoreLib/System/Guid.cs` |
-| `crates/pinewatch-mono/src/number.rs` | corert `src/System.Private.CoreLib/shared/System/Number.Parsing.cs`; corefx `Int32.cs` and `UInt32.cs` |
+| `crates/pinewatch-mono/src/number.rs` | corert `src/System.Private.CoreLib/shared/System/Number.Parsing.cs`; corefx `SByte.cs`, `Byte.cs`, `Int16.cs`, `UInt16.cs`, `Int32.cs`, `UInt32.cs`, `Int64.cs`, `UInt64.cs` |
 | `crates/pinewatch-mono/src/text.rs` | corefx `IO/StreamReader.cs`, `Text/UTF8Encoding.cs`, `Text/UnicodeEncoding.cs`, `Text/UTF32Encoding.cs` |
 | `crates/pinewatch-mono/src/exception.rs` | corefx `ArgumentException.cs` (`Message`) and the exception classes' default messages |
 | `crates/pinewatch-mono/src/chars.rs` | corefx `Char.cs` (`IsWhiteSpaceLatin1`) |
