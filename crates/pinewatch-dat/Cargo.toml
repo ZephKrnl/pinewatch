@@ -1,0 +1,10 @@
+[package]
+name = "pinewatch-dat"
+description = "Reader for the original game's .dat and .asset files"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+pinewatch-mono.workspace = true
