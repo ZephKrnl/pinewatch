@@ -1,27 +1,23 @@
+use pinewatch_io::find_install;
 use pinewatch_kvt::read_kvt_bytes;
 
 /// Every official map's `Level.hierarchy` parses without an exception. Skipped without an install.
 #[test]
 fn every_installed_level_hierarchy_parses() {
-    let Some(root) = install_root() else {
+    let Ok(install) = find_install(None) else {
         eprintln!("skipped: no Unturned install found");
         return;
     };
     let mut parsed = 0;
-    for entry in std::fs::read_dir(root.join("Maps")).unwrap() {
-        let path = entry.unwrap().path().join("Level.hierarchy");
-        let Ok(bytes) = std::fs::read(&path) else { continue };
-        let table = read_kvt_bytes(&bytes).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
-        assert!(table.len() > 0, "{} parsed empty", path.display());
+    for map in install.read_dir("Maps").unwrap() {
+        let rel = format!("Maps/{}/Level.hierarchy", map.to_string_lossy());
+        if !install.exists(&rel) {
+            continue;
+        }
+        let bytes = install.read(&rel).unwrap();
+        let table = read_kvt_bytes(&bytes).unwrap_or_else(|e| panic!("{rel}: {e}"));
+        assert!(!table.is_empty(), "{rel} parsed empty");
         parsed += 1;
     }
     assert!(parsed >= 9, "only {parsed} hierarchies found");
-}
-
-fn install_root() -> Option<std::path::PathBuf> {
-    let candidates = [
-        std::env::var_os("PINEWATCH_UNTURNED_DIR").map(std::path::PathBuf::from),
-        Some(std::path::PathBuf::from(r"C:\Program Files (x86)\Steam\steamapps\common\Unturned")),
-    ];
-    candidates.into_iter().flatten().find(|p| p.join("Maps").is_dir())
 }

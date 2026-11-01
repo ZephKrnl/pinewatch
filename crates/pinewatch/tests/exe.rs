@@ -13,26 +13,33 @@ fn have_install() -> bool {
 
 #[test]
 fn folder_that_is_not_an_install_exits_2_and_names_every_source() {
-    let dir = std::env::temp_dir().join(format!("pinewatch-exe-test-{}", std::process::id()));
-    std::fs::create_dir_all(&dir).unwrap();
-    let (code, stderr) = run(&["--unturned", dir.to_str().unwrap()]);
+    let dir = TempDir::empty("not-an-install");
+    let (code, stderr) = run(&["--unturned", dir.0.to_str().unwrap()]);
     assert_eq!(code, Some(2), "{stderr}");
     assert!(stderr.contains("--unturned") && stderr.contains("PINEWATCH_UNTURNED_DIR") && stderr.contains("Steam"), "{stderr}");
 }
 
-/// A temporary folder that looks like an install (`Maps` and `Bundles`), removed when dropped.
-struct FakeInstall(std::path::PathBuf);
+/// A folder under `%TEMP%`, removed when dropped.
+struct TempDir(std::path::PathBuf);
 
-impl FakeInstall {
-    fn new(name: &str) -> Self {
+impl TempDir {
+    fn empty(name: &str) -> Self {
         let dir = std::env::temp_dir().join(format!("pinewatch-exe-{name}-{}", std::process::id()));
-        std::fs::create_dir_all(dir.join("Maps")).unwrap();
-        std::fs::create_dir_all(dir.join("Bundles")).unwrap();
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
         Self(dir)
+    }
+
+    /// A folder that looks like an install: `Maps` and `Bundles`.
+    fn fake_install(name: &str) -> Self {
+        let dir = Self::empty(name);
+        std::fs::create_dir_all(dir.0.join("Maps")).unwrap();
+        std::fs::create_dir_all(dir.0.join("Bundles")).unwrap();
+        dir
     }
 }
 
-impl Drop for FakeInstall {
+impl Drop for TempDir {
     fn drop(&mut self) {
         let _ = std::fs::remove_dir_all(&self.0);
     }
@@ -40,7 +47,7 @@ impl Drop for FakeInstall {
 
 #[test]
 fn screenshot_inside_the_install_is_refused_before_anything_is_written() {
-    let install = FakeInstall::new("screenshot");
+    let install = TempDir::fake_install("screenshot");
     let root = install.0.to_str().unwrap().to_string();
     let dir_name = install.0.file_name().unwrap().to_str().unwrap().to_string();
     let targets = [

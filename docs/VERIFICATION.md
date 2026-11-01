@@ -98,10 +98,10 @@ isn't set up. Each entry says what the Rust code does, where the behavior came f
   against a real `Level.hierarchy` written by the shipped game. **Fix:** a registry of the game's hierarchy item
   types (devkit objects step), with `Type.GetType`'s name matching.
 - **V11. Level path string.** Messages use `<install root with \ separators, no trailing \>\Maps\<folder>`, followed by
-  `/Landscape/...`, as `Path.Combine` and `Directory.GetDirectories` build it. The original's root is
-  `DirectoryInfo.FullName`, an absolute, normalized path. Pinewatch uses the `--unturned` path as given, so a relative
-  path or one with `.` or `..` appears unnormalized. **Check:** the root string Unity reports
-  (`UnturnedPaths.RootDirectory.FullName`), including letter case.
+  `/Landscape/...`, as `Path.Combine` and `Directory.GetDirectories` build it. The root is `DirectoryInfo.FullName`:
+  Pinewatch makes the install path absolute and resolves `.` and `..` the way `Path.GetFullPath` does
+  (`GetFullPathNameW` on Windows). **Check:** the root string Unity reports
+  (`UnturnedPaths.RootDirectory.FullName`), including letter case and 8.3 short names.
 - **V12. I/O exception messages (gap).** A file that exists but fails to read becomes an `IOException` carrying Rust's
   error text, not Mono's. **Fix:** map OS error codes to Mono's exception types and messages.
 - **V13. Culture-formatted numbers in messages (gap).** `LandscapeCoord.ToString()` and `UnturnedLog`'s

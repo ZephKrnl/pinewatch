@@ -16,7 +16,29 @@ const SPLATMAP_BYTES: usize = 256 * 256 * 8;
 const GUID_A: &str = "53d3ea4a555c44d1824b495c2b337aec";
 const GUID_B: &str = "498ca625072d443a876b2a4f11896019";
 
-fn temp_install() -> PathBuf {
+/// A temporary install under `%TEMP%`, removed when dropped.
+struct TempInstall(PathBuf);
+
+impl std::ops::Deref for TempInstall {
+    type Target = Path;
+    fn deref(&self) -> &Path {
+        &self.0
+    }
+}
+
+impl AsRef<Path> for TempInstall {
+    fn as_ref(&self) -> &Path {
+        &self.0
+    }
+}
+
+impl Drop for TempInstall {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.0);
+    }
+}
+
+fn temp_install() -> TempInstall {
     static COUNTER: AtomicUsize = AtomicUsize::new(0);
     let n = COUNTER.fetch_add(1, Ordering::Relaxed);
     let dir = std::env::temp_dir().join(format!("pinewatch-level-test-{}-{n}", std::process::id()));
@@ -25,7 +47,7 @@ fn temp_install() -> PathBuf {
     fs::create_dir_all(dir.join("Maps").join("T").join("Landscape").join("Heightmaps")).unwrap();
     fs::create_dir_all(dir.join("Maps").join("T").join("Landscape").join("Splatmaps")).unwrap();
     fs::create_dir_all(dir.join("Maps").join("T").join("Landscape").join("Holes")).unwrap();
-    dir
+    TempInstall(dir)
 }
 
 fn tile_entry(x: i32, y: i32, materials: &str) -> String {
@@ -136,6 +158,24 @@ fn missing_heightmap_logs_the_exact_warning_and_keeps_default_heights() {
     assert!(log.entries.contains(&(LogLevel::Warn, expected)), "{:?}", log.entries);
     assert_eq!(tiles[0].heightmap[100][100], 0.5);
     assert_eq!(tiles[0].hashes.heightmap, None);
+}
+
+/// V11: the root is `DirectoryInfo.FullName`, so a path with `..` appears absolute and normalized.
+#[cfg(windows)]
+#[test]
+fn message_root_is_absolute_and_normalized() {
+    let dir = temp_install();
+    write_map(&dir, &[landscape_item("", &[tile_entry(0, 0, "")])]);
+    fs::write(dir.join("Maps/T/Landscape/Splatmaps/Tile_0_0_Source.splatmap"), vec![0u8; SPLATMAP_BYTES]).unwrap();
+    let detour = dir.join("..").join(dir.file_name().unwrap());
+    let install = InstallRoot::open(&detour).unwrap();
+    let mut log = MemoryLog::default();
+    read_landscape(&install, "T", &mut log).unwrap();
+    let expected = format!(
+        "LandscapeTile missing heightmap file: {}\\Maps\\T/Landscape/Heightmaps/Tile_0_0_Source.heightmap",
+        dir.to_string_lossy()
+    );
+    assert!(log.entries.contains(&(LogLevel::Warn, expected)), "{:?}", log.entries);
 }
 
 #[test]

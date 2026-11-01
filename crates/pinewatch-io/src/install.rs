@@ -55,6 +55,16 @@ impl InstallRoot {
         Ok(bytes)
     }
 
+    /// Reads at most `max_len` bytes from the start of a file, opened with read access only. Readers that consume a
+    /// bounded number of bytes use it, so a huge or corrupt file never causes a huge allocation.
+    pub fn read_prefix(&self, rel: &str, max_len: usize) -> io::Result<Vec<u8>> {
+        let path = self.resolve(rel)?;
+        let file = fs::OpenOptions::new().read(true).open(path)?;
+        let mut bytes = Vec::new();
+        file.take(max_len as u64).read_to_end(&mut bytes)?;
+        Ok(bytes)
+    }
+
     /// True if `rel` is an existing file (like `File.Exists`).
     pub fn exists(&self, rel: &str) -> bool {
         self.resolve(rel).is_ok_and(|p| p.is_file())

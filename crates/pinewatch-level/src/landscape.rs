@@ -21,6 +21,12 @@ pub const SPLATMAP_RESOLUTION: usize = 256;
 pub const SPLATMAP_LAYERS: usize = 8;
 pub const HOLES_RESOLUTION: usize = 256;
 
+// The most bytes each tile reader consumes: `readHeightmap` 2 per sample, `readSplatmap` 1 per layer, `ReadHoles` a
+// version byte and 1 bit per cell. Only that much of a file is read.
+const HEIGHTMAP_FILE_BYTES: usize = HEIGHTMAP_RESOLUTION * HEIGHTMAP_RESOLUTION * 2;
+const SPLATMAP_FILE_BYTES: usize = SPLATMAP_RESOLUTION * SPLATMAP_RESOLUTION * SPLATMAP_LAYERS;
+const HOLES_FILE_BYTES: usize = 1 + HOLES_RESOLUTION * HOLES_RESOLUTION / 8;
+
 /// Assembly-qualified name of `SDG.Framework.Landscapes.Landscape`.
 pub const LANDSCAPE_TYPE: &str =
     "SDG.Framework.Landscapes.Landscape, Assembly-CSharp, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null";
@@ -125,6 +131,7 @@ impl<'a> HashedBytes<'a> {
 
 /// Paths to one map's files, plus the path string the original builds for its messages:
 /// `Path.Combine(RootDirectory.FullName, "Maps")` + `\` + folder (from `Directory.GetDirectories`).
+/// `FullName` is `Path.GetFullPath`: absolute, with `.` and `..` resolved.
 struct MapPaths {
     folder: String,
     message_root: String,
@@ -146,7 +153,9 @@ impl MapPaths {
 
 #[cfg(windows)]
 fn level_path_string(install: &InstallRoot, folder: &str) -> String {
-    let mut root = install.root().to_string_lossy().replace('/', "\\");
+    // GetFullPathNameW, as Path.GetFullPath uses it. It only fails for an empty path, which an open install isn't.
+    let full = std::path::absolute(install.root()).unwrap_or_else(|_| install.root().to_path_buf());
+    let mut root = full.to_string_lossy().replace('/', "\\");
     while root.len() > 3 && root.ends_with('\\') {
         root.pop();
     }
@@ -156,7 +165,19 @@ fn level_path_string(install: &InstallRoot, folder: &str) -> String {
 
 #[cfg(not(windows))]
 fn level_path_string(install: &InstallRoot, folder: &str) -> String {
-    let mut root = install.root().to_string_lossy().into_owned();
+    // Path.GetFullPath on Unix: absolute, then `.` and `..` resolved lexically.
+    let absolute = std::path::absolute(install.root()).unwrap_or_else(|_| install.root().to_path_buf());
+    let mut full = std::path::PathBuf::new();
+    for part in absolute.components() {
+        match part {
+            std::path::Component::ParentDir => {
+                full.pop();
+            }
+            std::path::Component::CurDir => {}
+            other => full.push(other),
+        }
+    }
+    let mut root = full.to_string_lossy().into_owned();
     while root.len() > 1 && root.ends_with('/') {
         root.pop();
     }
@@ -287,7 +308,7 @@ fn read_heightmap(
         log.log(LogLevel::Warn, &format!("LandscapeTile missing heightmap file: {path}"));
         return Ok(());
     }
-    let bytes = install.read(&rel).map_err(io_exception)?;
+    let bytes = install.read_prefix(&rel, HEIGHTMAP_FILE_BYTES).map_err(io_exception)?;
     let mut stream = HashedBytes::new(&bytes);
     for row in tile.heightmap.iter_mut() {
         for sample in row.iter_mut() {
@@ -315,7 +336,7 @@ fn read_splatmap(
         log.log(LogLevel::Warn, &format!("LandscapeTile missing splatmap file: {path}"));
         return Ok(());
     }
-    let bytes = install.read(&rel).map_err(io_exception)?;
+    let bytes = install.read_prefix(&rel, SPLATMAP_FILE_BYTES).map_err(io_exception)?;
     let mut stream = HashedBytes::new(&bytes);
     for row in tile.splatmap.iter_mut() {
         for texel in row.iter_mut() {
@@ -337,7 +358,7 @@ fn read_holes(install: &InstallRoot, map: &MapPaths, tile: &mut LandscapeTile) -
     if !install.exists(&rel) {
         return Ok(());
     }
-    let bytes = install.read(&rel).map_err(io_exception)?;
+    let bytes = install.read_prefix(&rel, HOLES_FILE_BYTES).map_err(io_exception)?;
     let mut stream = HashedBytes::new(&bytes);
     let _version = stream.read_byte();
     for row in tile.holes.iter_mut() {

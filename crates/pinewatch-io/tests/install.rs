@@ -1,20 +1,36 @@
 use std::fs;
 use std::io::ErrorKind;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use pinewatch_io::{InstallRoot, LogLevel, LogSink, MemoryLog, find_install};
 
-fn temp_dir(name: &str) -> PathBuf {
+/// A folder under `%TEMP%`, removed when dropped.
+struct TempDir(PathBuf);
+
+impl std::ops::Deref for TempDir {
+    type Target = Path;
+    fn deref(&self) -> &Path {
+        &self.0
+    }
+}
+
+impl Drop for TempDir {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.0);
+    }
+}
+
+fn temp_dir(name: &str) -> TempDir {
     static COUNTER: AtomicUsize = AtomicUsize::new(0);
     let n = COUNTER.fetch_add(1, Ordering::Relaxed);
     let dir = std::env::temp_dir().join(format!("pinewatch-io-test-{}-{n}-{name}", std::process::id()));
     let _ = fs::remove_dir_all(&dir);
     fs::create_dir_all(&dir).unwrap();
-    dir
+    TempDir(dir)
 }
 
-fn fake_install(name: &str) -> PathBuf {
+fn fake_install(name: &str) -> TempDir {
     let dir = temp_dir(name);
     fs::create_dir_all(dir.join("Maps").join("PEI")).unwrap();
     fs::create_dir_all(dir.join("Bundles")).unwrap();
@@ -25,7 +41,7 @@ fn fake_install(name: &str) -> PathBuf {
 #[test]
 fn explicit_path_without_maps_is_not_an_install() {
     let dir = temp_dir("no-maps");
-    let err = find_install(Some(dir)).unwrap_err();
+    let err = find_install(Some(dir.to_path_buf())).unwrap_err();
     let text = err.to_string();
     assert!(text.contains("--unturned"), "{text}");
     assert!(text.contains("PINEWATCH_UNTURNED_DIR"), "{text}");
@@ -35,14 +51,14 @@ fn explicit_path_without_maps_is_not_an_install() {
 #[test]
 fn explicit_valid_path_is_used_as_is() {
     let dir = fake_install("valid");
-    let install = find_install(Some(dir.clone())).unwrap();
-    assert_eq!(install.root(), dir.as_path());
+    let install = find_install(Some(dir.to_path_buf())).unwrap();
+    assert_eq!(install.root(), &*dir);
 }
 
 #[test]
 fn reads_files_and_lists_directories() {
     let dir = fake_install("read");
-    let install = InstallRoot::open(&dir).unwrap();
+    let install = InstallRoot::open(&*dir).unwrap();
     assert_eq!(install.read("Maps/PEI/Level.dat").unwrap(), vec![1, 2, 3]);
     assert!(install.exists("Maps/PEI/Level.dat"));
     assert!(!install.exists("Maps/PEI/Missing.dat"));
@@ -51,9 +67,19 @@ fn reads_files_and_lists_directories() {
 }
 
 #[test]
+fn read_prefix_reads_at_most_max_len() {
+    let dir = temp_dir("prefix");
+    fs::write(dir.join("ten.bin"), [0u8, 1, 2, 3, 4, 5, 6, 7, 8, 9]).unwrap();
+    let install = InstallRoot::open(&*dir).unwrap();
+    assert_eq!(install.read_prefix("ten.bin", 4).unwrap(), vec![0, 1, 2, 3]);
+    assert_eq!(install.read_prefix("ten.bin", 100).unwrap(), (0u8..10).collect::<Vec<_>>());
+    assert_eq!(install.read_prefix("../ten.bin", 4).unwrap_err().kind(), ErrorKind::InvalidInput);
+}
+
+#[test]
 fn paths_that_leave_the_install_are_refused() {
     let dir = fake_install("escape");
-    let install = InstallRoot::open(&dir).unwrap();
+    let install = InstallRoot::open(&*dir).unwrap();
     assert_eq!(install.read("../outside.txt").unwrap_err().kind(), ErrorKind::InvalidInput);
     assert_eq!(install.read("Maps/../../outside.txt").unwrap_err().kind(), ErrorKind::InvalidInput);
     assert_eq!(install.read("C:/Windows/win.ini").unwrap_err().kind(), ErrorKind::InvalidInput);
