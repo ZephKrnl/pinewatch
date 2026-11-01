@@ -13,6 +13,8 @@ mod structs;
 mod tokenizer;
 mod tree;
 mod types;
+mod unity_color_ex;
+mod unity_ex;
 mod value_ex;
 
 pub use comment::DatComment;

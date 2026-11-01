@@ -8,3 +8,4 @@ publish.workspace = true
 
 [dependencies]
 pinewatch-mono.workspace = true
+pinewatch-unity.workspace = true

@@ -1,8 +1,8 @@
 //! Unity value types exactly as the original game stores them.
 //!
 //! Each struct mirrors the one of the same name in the installed game's `UnityEngine.CoreModule.dll` (Unity
-//! 2022.3.62f3): the same public fields in the same order, so the same size. The constructors, `Default` and
-//! `PartialEq` follow that assembly's IL:
+//! 2022.3.62f3): the same public fields in the same order, so the same size. The constructors, `Default`,
+//! `PartialEq` and the `Color32` to `Color` conversion follow that assembly's IL:
 //!
 //! - `Default` is C#'s `default(T)`: every field zero.
 //! - `PartialEq` is the type's `Equals(T)`. `Vector2` and `Vector3` compare each component with `==`, so a NaN
@@ -63,6 +63,14 @@ impl Color {
     /// `new Color(r, g, b)`: `a` is `1.0`.
     pub const fn rgb(r: f32, g: f32, b: f32) -> Self {
         Self { r, g, b, a: 1.0 }
+    }
+}
+
+impl From<Color32> for Color {
+    /// `implicit operator Color(Color32 c)`: each channel through `conv.r4`, then divided by `255f`. One division of
+    /// two exact values rounds the same whether Mono computes it in single or double precision.
+    fn from(c: Color32) -> Self {
+        Self::new(f32::from(c.r) / 255.0, f32::from(c.g) / 255.0, f32::from(c.b) / 255.0, f32::from(c.a) / 255.0)
     }
 }
 

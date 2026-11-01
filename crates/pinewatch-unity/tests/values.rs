@@ -37,6 +37,18 @@ fn color32_compares_its_bytes() {
     assert_ne!(Color32::new(1, 2, 3, 4), Color32::new(1, 2, 3, 5));
 }
 
+/// `implicit operator Color(Color32 c)`: each channel through `conv.r4`, then divided by `255f`. The expected bits
+/// were computed apart from Rust (`n / 255` rounded to single precision).
+#[test]
+fn color32_converts_to_color_by_dividing_by_255() {
+    let color = Color::from(Color32::new(0, 128, 255, 1));
+    assert_eq!(0.0f32.to_bits(), color.r.to_bits());
+    assert_eq!(0x3F00_8081, color.g.to_bits());
+    assert_eq!(1.0f32.to_bits(), color.b.to_bits());
+    assert_eq!(0x3B80_8081, color.a.to_bits());
+    assert_eq!(0x3F7E_FEFF, Color::from(Color32::new(254, 0, 0, 0)).r.to_bits());
+}
+
 #[test]
 fn layout_matches_unity() {
     assert_eq!(std::mem::size_of::<Vector2>(), 8);
