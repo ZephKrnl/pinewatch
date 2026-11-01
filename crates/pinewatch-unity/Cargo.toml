@@ -1,0 +1,9 @@
+[package]
+name = "pinewatch-unity"
+description = "Unity value types exactly as the original game stores them"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]

@@ -13,6 +13,7 @@ pinewatch-mono = { path = "crates/pinewatch-mono" }
 pinewatch-io = { path = "crates/pinewatch-io" }
 pinewatch-kvt = { path = "crates/pinewatch-kvt" }
 pinewatch-level = { path = "crates/pinewatch-level" }
+pinewatch-unity = { path = "crates/pinewatch-unity" }
 
 # Dependencies stay small and pinned to a minor version. Format crates may only use
 # sha1, png and windows-sys (see docs/ARCHITECTURE.md).
