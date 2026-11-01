@@ -5,12 +5,19 @@
 //! `docs/VERIFICATION.md`.
 
 mod comment;
+mod dictionary_ex;
 mod dump;
+mod list_ex;
 mod parser;
+mod structs;
 mod tokenizer;
 mod tree;
+mod types;
+mod value_ex;
 
 pub use comment::DatComment;
 pub use parser::DatParser;
+pub use structs::DatParseable;
+pub use types::{TypeHandle, TypeResolver};
 pub use tokenizer::{DatToken, DatTokenType, DatTokenizer};
 pub use tree::{DatNodeType, DatTree, DictRef, ListRef, NodeId, NodeRef, ValueRef};

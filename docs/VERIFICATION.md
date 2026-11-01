@@ -133,6 +133,11 @@ isn't set up. Each entry says what the Rust code does, where the behavior came f
   from Rust's Unicode tables, not Mono's (V3). Equal keys merge: the first spelling stays and the last value wins,
   with a `duplicate key` error. **Check:** non-ASCII key pairs that differ only by case merge, or stay apart, exactly
   as in the game. That depends on both `Equals` and `GetHashCode` of Mono's `OrdinalIgnoreCase` comparer.
+- **V19. Type names in `.dat` values (gap).** `ParseType` calls `Type.GetType(name, false, ignoreCase: true)`, which
+  searches the calling assembly (`UnturnedDat.dll`) and `mscorlib.dll` unless the name says which assembly, and
+  matches case-insensitively. Pinewatch asks a `TypeResolver`, and no resolver knows the game's types yet, as in V10.
+  The checks before the lookup (null or empty value, `\`, `:` or `/` in the name) are ported. **Fix:** a type
+  registry built from the shipped assemblies, with `Type.GetType`'s name matching.
 
 ## Settled without the harness
 

@@ -4,7 +4,61 @@
 #![allow(dead_code)]
 
 use pinewatch_dat::{DatParser, DatTree, DictRef, ListRef, ValueRef};
-use pinewatch_mono::NetString;
+use pinewatch_mono::{EnumInfo, EnumUnderlying, NetEnum, NetString};
+
+/// `dictionary["key"] = new DatValue(input)`: a tree whose root holds `input` under `key`. It's parsed from
+/// `key "…"` with `\` and `"` escaped, which reads back exactly `input`.
+pub fn tree_with_value(input: &str) -> DatTree {
+    let escaped = input.replace('\\', "\\\\").replace('"', "\\\"");
+    let (parser, tree) = parse(&format!("key \"{escaped}\""));
+    assert!(!parser.has_error(), "{:?}", parser.error_messages());
+    tree
+}
+
+/// `EDatTestEnum` from the C# tests.
+#[repr(transparent)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct DatTestEnum(pub i32);
+
+impl DatTestEnum {
+    pub const NONE: Self = Self(0);
+    pub const BEAR: Self = Self(1);
+    pub const DOG: Self = Self(2);
+}
+
+impl NetEnum for DatTestEnum {
+    const INFO: EnumInfo =
+        EnumInfo { underlying: EnumUnderlying::I32, names: &["None", "Bear", "Dog"], values: &[0, 1, 2] };
+
+    fn from_bits(bits: u64) -> Self {
+        Self(bits as i32)
+    }
+}
+
+/// `[System.Flags] EDatTestEnumFlags` from the C# tests, where `Flag2` is `2 << 1`.
+#[repr(transparent)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct DatTestEnumFlags(pub i32);
+
+impl DatTestEnumFlags {
+    pub const NONE: Self = Self(0);
+    pub const FLAG1: Self = Self(1 << 0);
+    pub const FLAG2: Self = Self(2 << 1);
+
+    /// `self | other`.
+    pub const fn with(self, other: Self) -> Self {
+        Self(self.0 | other.0)
+    }
+}
+
+impl NetEnum for DatTestEnumFlags {
+    const INFO: EnumInfo =
+        EnumInfo { underlying: EnumUnderlying::I32, names: &["None", "Flag1", "Flag2"], values: &[0, 1, 4] };
+
+    fn from_bits(bits: u64) -> Self {
+        Self(bits as i32)
+    }
+}
 
 /// `new DatParser().Parse(input)`.
 pub fn parse(input: &str) -> (DatParser, DatTree) {

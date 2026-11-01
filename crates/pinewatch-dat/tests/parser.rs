@@ -8,7 +8,7 @@ use common::{
     list_get_string, parse,
 };
 use pinewatch_dat::{DatNodeType, DatParser, NodeRef};
-use pinewatch_mono::{NEW_LINE, NetString};
+use pinewatch_mono::{Guid, NEW_LINE, NetString};
 
 /// `IgnoreRootComments`.
 const IGNORE_ROOT_COMMENTS: &[&str] = &[
@@ -915,8 +915,12 @@ fn parse_escaped_new_line() {
     assert_key_value(PARSE_ESCAPED_NEW_LINE);
 }
 
-/// Keys and values from a typical old vanilla .dat file. The C# also parses `ID`, `GUID` and `EnableSomething`
-/// with `ParseUInt16`, `ParseGuid` and `ParseBool`; here they are checked as the strings those parse.
+/// `new System.Guid("4d362f61e4324509844feedd1a69ae19")`.
+fn asset_guid() -> Guid {
+    Guid::parse(&NetString::from("4d362f61e4324509844feedd1a69ae19")).expect("a valid GUID")
+}
+
+/// Keys and values from a typical old vanilla .dat file.
 #[test]
 fn parse_safe_v1_asset() {
     for &contents in PARSE_SAFE_V1_ASSET {
@@ -924,15 +928,14 @@ fn parse_safe_v1_asset() {
         assert_no_error(&parser, contents);
         let dictionary = tree.root();
         assert_string("Item", get_string(dictionary, "Type"), contents);
-        assert_string("342", get_string(dictionary, "ID"), contents);
-        assert_string("4d362f61e4324509844feedd1a69ae19", get_string(dictionary, "GUID"), contents);
+        assert_eq!(342, dictionary.parse_uint16("ID", 0), "{contents:?}");
+        assert_eq!(asset_guid(), dictionary.parse_guid("GUID", Guid::default()), "{contents:?}");
         assert!(dictionary.contains_key("Flag1"), "{contents:?}");
-        assert_string("true", get_string(dictionary, "EnableSomething"), contents);
+        assert!(dictionary.parse_bool("EnableSomething", false), "{contents:?}");
     }
 }
 
-/// The contents of a typical vanilla .asset file. The C# parses `GUID`, `X`, `Y`, `A` and `B` with `ParseGuid`
-/// and `ParseInt32`; here they are checked as the strings those parse.
+/// The contents of a typical vanilla .asset file.
 #[test]
 fn parse_safe_v2_asset() {
     for &contents in PARSE_SAFE_V2_ASSET {
@@ -941,23 +944,23 @@ fn parse_safe_v2_asset() {
         let root_dictionary = tree.root();
 
         let metadata = found(get_dictionary(root_dictionary, "Metadata"), "metadata", contents);
-        assert_string("4d362f61e4324509844feedd1a69ae19", get_string(metadata, "GUID"), contents);
+        assert_eq!(asset_guid(), metadata.parse_guid("GUID", Guid::default()), "{contents:?}");
         assert_string("SDG.Unturned.ItemAsset", get_string(metadata, "Type"), contents);
 
         let asset = found(get_dictionary(root_dictionary, "Asset"), "asset", contents);
         assert_string("Bear+Dog", get_string(asset, "Name"), contents);
 
         let substruct = found(get_dictionary(asset, "Struct"), "substruct", contents);
-        assert_string("1", get_string(substruct, "X"), contents);
-        assert_string("2", get_string(substruct, "Y"), contents);
+        assert_eq!(1, substruct.parse_int32("X", 0), "{contents:?}");
+        assert_eq!(2, substruct.parse_int32("Y", 0), "{contents:?}");
 
         let list = found(get_list(asset, "Array"), "list", contents);
         let list_dict0 = found(list_get_dictionary(list, 0), "listDict0", contents);
         let list_dict1 = found(list_get_dictionary(list, 1), "listDict1", contents);
-        assert_string("3", get_string(list_dict0, "A"), contents);
-        assert_string("4", get_string(list_dict0, "B"), contents);
-        assert_string("5", get_string(list_dict1, "A"), contents);
-        assert_string("6", get_string(list_dict1, "B"), contents);
+        assert_eq!(3, list_dict0.parse_int32("A", 0), "{contents:?}");
+        assert_eq!(4, list_dict0.parse_int32("B", 0), "{contents:?}");
+        assert_eq!(5, list_dict1.parse_int32("A", 0), "{contents:?}");
+        assert_eq!(6, list_dict1.parse_int32("B", 0), "{contents:?}");
     }
 }
 
