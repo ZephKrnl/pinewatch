@@ -5,5 +5,6 @@
 pub mod app;
 pub mod camera;
 pub mod cli;
+pub mod screenshot;
 pub mod space;
 pub mod terrain;

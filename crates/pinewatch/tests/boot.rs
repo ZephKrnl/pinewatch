@@ -77,3 +77,46 @@ fn cli_rejects_unknown_options_and_missing_values() {
     assert!(args(&["pinewatch", "--frobnicate"]).unwrap_err().contains("--frobnicate"));
     assert!(args(&["pinewatch", "--map"]).unwrap_err().contains("--map"));
 }
+
+#[test]
+fn cli_requires_a_png_screenshot() {
+    assert!(args(&["pinewatch", "--screenshot", "shot.jpg"]).unwrap_err().contains(".png"));
+    assert!(args(&["pinewatch", "--screenshot", "shot"]).unwrap_err().contains(".png"));
+    assert_eq!(args(&["pinewatch", "--screenshot", "Shot.PNG"]).unwrap().screenshot, Some("Shot.PNG".into()));
+}
+
+#[test]
+fn screenshot_written_requires_a_new_or_changed_file() {
+    use pinewatch::screenshot::{modified_time, was_written};
+    let dir = std::env::temp_dir().join(format!("pinewatch-boot-screenshot-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("shot.png");
+    let _ = std::fs::remove_file(&path);
+
+    let before = modified_time(&path);
+    assert_eq!(before, None);
+    assert!(!was_written(&path, before), "a missing file is not written");
+    std::fs::write(&path, b"1").unwrap();
+    assert!(was_written(&path, before), "a new file is written");
+
+    let before = modified_time(&path);
+    assert!(!was_written(&path, before), "an untouched old file is not written");
+    std::thread::sleep(std::time::Duration::from_millis(20));
+    std::fs::write(&path, b"2").unwrap();
+    assert!(was_written(&path, before), "a rewritten file is written");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn screenshot_paths_inside_the_install_are_detected() {
+    use pinewatch::screenshot::inside_install;
+    let root = std::env::temp_dir().join(format!("pinewatch-boot-install-{}", std::process::id()));
+    std::fs::create_dir_all(root.join("Maps")).unwrap();
+    let name = root.file_name().unwrap().to_owned();
+    assert!(inside_install(&root.join("a.png"), &root).unwrap());
+    assert!(inside_install(&root.join("Maps").join("not-yet").join("a.png"), &root).unwrap());
+    assert!(inside_install(&root.join("..").join(&name).join("a.png"), &root).unwrap());
+    assert!(!inside_install(&root.with_file_name("pinewatch-elsewhere").join("a.png"), &root).unwrap());
+    assert!(!inside_install(&root.join("..").join("a.png"), &root).unwrap());
+    let _ = std::fs::remove_dir_all(&root);
+}

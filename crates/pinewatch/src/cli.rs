@@ -28,7 +28,13 @@ pub fn parse_args(args: impl IntoIterator<Item = OsString>) -> Result<Cli, Strin
         match name.as_str() {
             "--unturned" => cli.unturned = Some(PathBuf::from(value()?)),
             "--map" => cli.map = value()?.to_string_lossy().into_owned(),
-            "--screenshot" => cli.screenshot = Some(PathBuf::from(value()?)),
+            "--screenshot" => {
+                let path = PathBuf::from(value()?);
+                if !path.extension().is_some_and(|ext| ext.eq_ignore_ascii_case("png")) {
+                    return Err(format!("--screenshot needs a .png file, not {}", path.display()));
+                }
+                cli.screenshot = Some(path);
+            }
             "--help" | "-h" => cli.help = true,
             other => return Err(format!("Unknown option: {other}")),
         }

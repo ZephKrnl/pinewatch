@@ -10,9 +10,11 @@ use pinewatch_level::read_landscape;
 
 use crate::camera::FlyCameraPlugin;
 use crate::cli::{USAGE, parse_args};
+use crate::screenshot::{inside_install, modified_time, was_written};
 use crate::terrain::{LoadedTerrain, TerrainPlugin};
 
-/// Exit codes: 2 = bad options, no install or unknown map; 3 = map has no landscape; 4 = map failed to load.
+/// Exit codes: 2 = bad options, no install, unknown map or a screenshot path inside the install;
+/// 3 = map has no landscape; 4 = map failed to load; 5 = the screenshot wasn't saved.
 pub fn main() -> ExitCode {
     let cli = match parse_args(std::env::args_os()) {
         Ok(cli) => cli,
@@ -33,6 +35,21 @@ pub fn main() -> ExitCode {
             return ExitCode::from(2);
         }
     };
+
+    // Nothing is ever written inside the install, so a screenshot there is refused before anything runs.
+    if let Some(path) = &cli.screenshot {
+        match inside_install(path, install.root()) {
+            Ok(false) => {}
+            Ok(true) => {
+                eprintln!("Refusing to save the screenshot inside the Unturned install: {}", path.display());
+                return ExitCode::from(2);
+            }
+            Err(error) => {
+                eprintln!("Can't check where the screenshot {} would go: {error}", path.display());
+                return ExitCode::from(2);
+            }
+        }
+    }
 
     let maps = list_maps(&install);
     let Some(map) = resolve_map(&maps, &cli.map) else {
@@ -107,6 +124,8 @@ fn run(terrain: LoadedTerrain, screenshot: Option<PathBuf>) -> ExitCode {
         .insert_resource(terrain)
         .add_plugins((TerrainPlugin, FlyCameraPlugin));
 
+    // Bevy's `save_to_disk` only logs a failed save, so the file itself is checked after the app exits.
+    let expected = screenshot.as_ref().map(|path| (path.clone(), modified_time(path)));
     if let Some(path) = screenshot {
         // Wait for shader pipelines to finish compiling before capturing.
         app.insert_resource(ScreenshotRequest { path, frames_left: 240, taken: false })
@@ -114,7 +133,15 @@ fn run(terrain: LoadedTerrain, screenshot: Option<PathBuf>) -> ExitCode {
     }
 
     match app.run() {
-        AppExit::Success => ExitCode::SUCCESS,
+        AppExit::Success => {
+            if let Some((path, before)) = expected {
+                if !was_written(&path, before) {
+                    eprintln!("The screenshot wasn't saved to {}", path.display());
+                    return ExitCode::from(5);
+                }
+            }
+            ExitCode::SUCCESS
+        }
         AppExit::Error(code) => ExitCode::from(code.get()),
     }
 }

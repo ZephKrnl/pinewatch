@@ -20,6 +20,45 @@ fn folder_that_is_not_an_install_exits_2_and_names_every_source() {
     assert!(stderr.contains("--unturned") && stderr.contains("PINEWATCH_UNTURNED_DIR") && stderr.contains("Steam"), "{stderr}");
 }
 
+/// A temporary folder that looks like an install (`Maps` and `Bundles`), removed when dropped.
+struct FakeInstall(std::path::PathBuf);
+
+impl FakeInstall {
+    fn new(name: &str) -> Self {
+        let dir = std::env::temp_dir().join(format!("pinewatch-exe-{name}-{}", std::process::id()));
+        std::fs::create_dir_all(dir.join("Maps")).unwrap();
+        std::fs::create_dir_all(dir.join("Bundles")).unwrap();
+        Self(dir)
+    }
+}
+
+impl Drop for FakeInstall {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.0);
+    }
+}
+
+#[test]
+fn screenshot_inside_the_install_is_refused_before_anything_is_written() {
+    let install = FakeInstall::new("screenshot");
+    let root = install.0.to_str().unwrap().to_string();
+    let dir_name = install.0.file_name().unwrap().to_str().unwrap().to_string();
+    let targets = [
+        format!("{root}/new-folder/shot.png"),
+        format!("{root}/Maps/shot.png"),
+        format!("{root}/../{dir_name}/shot.png"),
+        format!("{}/MAPS/shot.png", root.to_uppercase()),
+    ];
+    for target in targets {
+        let (code, stderr) = run(&["--unturned", &root, "--screenshot", &target]);
+        assert_eq!(code, Some(2), "{target}: {stderr}");
+        assert!(stderr.contains("inside the Unturned install"), "{target}: {stderr}");
+    }
+    assert!(!install.0.join("new-folder").exists(), "a folder was created inside the install");
+    let entries: Vec<_> = std::fs::read_dir(&install.0).unwrap().map(|e| e.unwrap().file_name()).collect();
+    assert_eq!(entries.len(), 2, "{entries:?}");
+}
+
 #[test]
 fn unknown_option_exits_2_with_usage() {
     let (code, stderr) = run(&["--frobnicate"]);
