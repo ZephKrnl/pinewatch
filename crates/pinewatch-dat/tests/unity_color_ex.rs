@@ -1,6 +1,9 @@
 //! The color helpers: every row of `Assets/Tests/UnturnedDat/UnityDatColorExTests.cs`, one table per C# test
 //! method, plus the values a failed parse hands back.
 
+// The tables mirror the C# test methods' parameter lists.
+#![allow(clippy::type_complexity)]
+
 mod common;
 
 use common::{found, get_value, parse, tree_with_value};

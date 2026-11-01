@@ -138,6 +138,10 @@ isn't set up. Each entry says what the Rust code does, where the behavior came f
   matches case-insensitively. Pinewatch asks a `TypeResolver`, and no resolver knows the game's types yet, as in V10.
   The checks before the lookup (null or empty value, `\`, `:` or `/` in the name) are ported. **Fix:** a type
   registry built from the shipped assemblies, with `Type.GetType`'s name matching.
+- **V20. Legacy `readBoolean` comparison (gap).** `Data.readBoolean` compares with `"y"` and `"true"` using
+  `StringComparison.InvariantCultureIgnoreCase`, a linguistic comparison through Mono's collation tables, which skips
+  ignorable characters such as U+00AD (soft hyphen). Pinewatch compares code units ignoring case, so it matches for
+  every value without such characters. **Check:** `readBoolean` on `y` and `true` with ignorable characters inserted.
 
 ## Settled without the harness
 

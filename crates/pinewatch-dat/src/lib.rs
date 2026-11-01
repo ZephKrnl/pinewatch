@@ -7,6 +7,7 @@
 mod comment;
 mod dictionary_ex;
 mod dump;
+mod legacy;
 mod list_ex;
 mod parser;
 mod structs;
@@ -18,6 +19,7 @@ mod unity_ex;
 mod value_ex;
 
 pub use comment::DatComment;
+pub use legacy::LegacyData;
 pub use parser::DatParser;
 pub use structs::DatParseable;
 pub use types::{TypeHandle, TypeResolver};
