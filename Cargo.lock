@@ -4492,6 +4492,9 @@ dependencies = [
 [[package]]
 name = "pinewatch-mono"
 version = "0.1.0"
+dependencies = [
+ "pinewatch-io",
+]
 
 [[package]]
 name = "piper"

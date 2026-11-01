@@ -44,7 +44,12 @@ The Rust code reproduces the behavior of **that runtime**, not of modern .NET an
 number parsing and formatting, culture data and how the current culture is chosen, UTF-8 decoding, BOM detection,
 character tables (whitespace, case mapping), `Dictionary` iteration order (including slot reuse after removals),
 `Guid`/`Enum`/`bool`/`DateTime` parsing, and exception types and messages.
-Where Rust code is ported from Mono's MIT-licensed class libraries, it carries Mono's license notice.
+
+Ported runtime behavior follows the source files that Unity's Mono actually compiles for the Windows player, as
+its `unityjit` build lists name them. Those are mostly corefx and corert files, not Mono's own files or the
+reference-source files of the same names. Ports are checked against the shipped `mscorlib.dll`
+(`docs/VERIFICATION.md`, V0). Those sources are MIT-licensed. Each ported Rust file names its source in a header,
+and the license notices are in `NOTICES-PORTED-CODE.md`.
 
 ## How equivalence is proven
 

@@ -1,7 +1,16 @@
+// The Latin-1 whitespace rule is ported from corefx `src/Common/src/CoreLib/System/Char.cs` (mono/corefx 5b4edb9b).
+// Copyright (c) .NET Foundation and Contributors. MIT license; see NOTICES-PORTED-CODE.md.
+
 //! `System.Char` classification and case mapping for one UTF-16 code unit.
 //!
-//! ASCII and Latin-1 follow Mono exactly. Above Latin-1 these use Rust's Unicode data until the harness dumps
-//! Mono's own tables (`docs/VERIFICATION.md`, "Unicode tables").
+//! - `IsWhiteSpace` follows corefx exactly up to U+00FF (`IsWhiteSpaceLatin1`). Above that it uses Rust's
+//!   `White_Space` property, which for current Unicode data is the same set as .NET's space, line and paragraph
+//!   separator categories.
+//! - Case mapping is exact for ASCII. Above ASCII it uses Rust's mappings when they map to a single code unit and
+//!   leaves the character unchanged otherwise. .NET uses simple mappings, so a few characters differ (for example
+//!   U+0130 lowercases to U+0069 in .NET but stays U+0130 here).
+//!
+//! Both gaps wait for the harness to dump Mono's tables (`docs/VERIFICATION.md`, V3).
 
 fn as_char(c: u16) -> Option<char> {
     char::from_u32(u32::from(c))
@@ -13,22 +22,6 @@ pub fn is_white_space(c: u16) -> bool {
         c == 0x20 || (0x09..=0x0D).contains(&c) || c == 0xA0 || c == 0x85
     } else {
         as_char(c).is_some_and(char::is_whitespace)
-    }
-}
-
-/// `char.IsNumber` (categories Nd, Nl, No).
-pub fn is_number(c: u16) -> bool {
-    if c < 0x80 { (0x30..=0x39).contains(&c) } else { as_char(c).is_some_and(char::is_numeric) }
-}
-
-/// `char.IsLetter` (categories Lu, Ll, Lt, Lm, Lo).
-pub fn is_letter(c: u16) -> bool {
-    match c {
-        0x41..=0x5A | 0x61..=0x7A => true,
-        0..=0x7F => false,
-        0xAA | 0xB5 | 0xBA | 0xC0..=0xD6 | 0xD8..=0xF6 | 0xF8..=0xFF => true,
-        0x80..=0xFF => false,
-        _ => as_char(c).is_some_and(|ch| ch.is_alphabetic() && !ch.is_numeric()),
     }
 }
 

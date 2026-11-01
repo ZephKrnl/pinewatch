@@ -168,14 +168,6 @@ fn io_exception(error: io::Error) -> MonoException {
     MonoException::new(ExceptionKind::Io, error.to_string())
 }
 
-/// `List<T>`'s indexer message for an index out of range.
-fn list_index_out_of_range() -> MonoException {
-    MonoException::new(
-        ExceptionKind::ArgumentOutOfRange,
-        "Index was out of range. Must be non-negative and less than the size of the collection.\nParameter name: index",
-    )
-}
-
 /// Reads a map's landscape. `None` when the map has no `Level.hierarchy` or no `Landscape` item (for example
 /// legacy-ground maps). Messages go to `log` with the original's exact text.
 pub fn read_landscape(
@@ -264,7 +256,10 @@ fn read_tile(
                 nested.read_guid()?
             }
         };
-        let slot = usize::try_from(layer).ok().and_then(|l| tile.materials.get_mut(l)).ok_or_else(list_index_out_of_range)?;
+        let slot = usize::try_from(layer)
+            .ok()
+            .and_then(|l| tile.materials.get_mut(l))
+            .ok_or_else(MonoException::list_index_out_of_range)?;
         *slot = guid;
     }
 

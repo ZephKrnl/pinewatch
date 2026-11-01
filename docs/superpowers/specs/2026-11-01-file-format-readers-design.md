@@ -207,7 +207,8 @@ C:\Pinewatch
 ├─ rust-toolchain.toml         pinned stable toolchain (currently 1.99.1), edition 2024
 ├─ README.md                   attribution and disclaimers (section 8)
 ├─ LICENSE.txt                 U3 SDK License Agreement, verbatim
-├─ THIRDPARTYNOTICES.txt       the SDK's notices, plus MIT notices for code ported from Mono and for external crates
+├─ THIRDPARTYNOTICES.txt       the SDK's notices, an unmodified copy
+├─ NOTICES-PORTED-CODE.md      MIT notices for code ported from the .NET class libraries Unity's Mono compiles
 ├─ COMPATIBILITY.md
 ├─ docs/                       PORT_SURVEY.md, FORMAT_INVENTORY.md, superpowers/specs/
 ├─ crates/                     pinewatch-* crates
@@ -218,6 +219,10 @@ C:\Pinewatch
 │  └─ work/                    ignored: working copy and Unity cache
 └─ testdata/                   ignored: copied game files and reference outputs
 ```
+
+> **Amended 2026-11-01 (M1 review).** The MIT notices moved from `THIRDPARTYNOTICES.txt` to `NOTICES-PORTED-CODE.md`,
+> so `THIRDPARTYNOTICES.txt` stays an exact copy of the SDK's file (as the M1 plan checks). Notices for external
+> crates will be generated into a notice file before any build leaves this machine; nothing is distributed today.
 
 Pinewatch is a Mod under the U3 SDK License Agreement, so the repository follows that agreement (section 1). The repository sets `core.longpaths true`.
 

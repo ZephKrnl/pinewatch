@@ -74,6 +74,12 @@
   - GUID: N, D, B, P and X forms parse to the same bytes; `"0"` fails with `Format`; `to_string_n` gives 32 lowercase hex digits.
 - [ ] **Step 2:** Run `cargo test -p pinewatch-mono`. Expected: FAIL (items not defined).
 - [ ] **Step 3: Implement.** Port Mono's `Number.ParseNumber` state machine (reference source) for integers: whitespace set `0x09..=0x0D, 0x20`; signs, parentheses, currency, group separator only after a digit; trailing `\0` accepted; non-zero fractional digits fail. Port the `Guid` parser from the same reference source.
+
+  > **Correction (M1 review, 2026-11-01).** Unity's Mono doesn't compile those reference-source files. Its Windows
+  > `unityjit` corlib build compiles corefx `ParseNumbers.cs`, `Guid.cs`, `Int32.cs`/`UInt32.cs`, `StreamReader.cs`
+  > and the `Text/*Encoding.cs` decoders, plus corert `Number.Parsing.cs`. `pinewatch-mono` was re-ported from those
+  > files, and the English messages were checked against the shipped `mscorlib.dll`. See `docs/VERIFICATION.md`, V0.
+  > Every later port cites the file that build list compiles.
 - [ ] **Step 4:** Run `cargo test -p pinewatch-mono`. Expected: PASS.
 - [ ] **Step 5:** Add every ported rule whose exact Mono wording or edge behavior isn't harness-confirmed yet to `docs/VERIFICATION.md`.
 - [ ] **Step 6: Commit.**
@@ -148,7 +154,7 @@
   - A heightmap 1 byte short makes its last sample 1.0 (65535).
   - An empty splatmap yields 1.0 in every layer.
   - A holes file with byte `0b0000_0001` makes only offset 0 solid.
-  - A missing heightmap logs exactly `LandscapeTile missing heightmap file: <path>` at warn level and leaves heights at 0.
+  - A missing heightmap logs exactly `LandscapeTile missing heightmap file: <path>` at warn level and leaves heights at 0.5 (the constructor's default; corrected in the M1 review, the code was already right).
   - Hashes cover exactly the bytes consumed.
 - [ ] **Step 2:** Run `cargo test -p pinewatch-level`. Expected: FAIL.
 - [ ] **Step 3: Implement** as ports of `LandscapeTile.read`, `readHeightmap`, `readSplatmap`, `ReadHoles`, `LandscapeCoord.read`, `AssetReference.read` and the item loop of `LevelHierarchy.read`.

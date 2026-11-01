@@ -1,9 +1,15 @@
-//! Number parsing: port of `System.Number` (`ParseNumber`, `TryStringToNumber`, `NumberToInt32`,
-//! `NumberToUInt32`, `HexNumberToUInt32`) from Mono's reference source.
-//!
-//! C# walks a NUL-terminated `char*`; here [`at`] returns 0 past the end, which is the same sentinel.
+// Ported from corert `src/System.Private.CoreLib/shared/System/Number.Parsing.cs` (mono/corert 11136ad5), corefx
+// `Int32.cs` and `UInt32.cs` (mono/corefx 5b4edb9b): Copyright (c) .NET Foundation and Contributors.
+// `NumberFormatInfo.ValidateParseStyleInteger` from reference source `numberformatinfo.cs`: Copyright (c) Microsoft
+// Corporation. MIT license; see NOTICES-PORTED-CODE.md.
 
-use crate::NetString;
+//! Integer parsing: `Int32.TryParse` and `UInt32.TryParse` with a style and a format provider.
+//!
+//! As in corert, styles within `NumberStyles.Integer` take an optimized path, hexadecimal styles take their own,
+//! and everything else goes through the `ParseNumber` state machine. A C# `char*` walk reads `'\0'` past the
+//! end; [`at`] returns 0 there, the same sentinel.
+
+use crate::{MonoException, NetString, sr};
 
 /// `System.Globalization.NumberStyles`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -29,6 +35,11 @@ impl NumberStyles {
     pub const CURRENCY: Self = Self(0x17F);
     pub const ANY: Self = Self(0x1FF);
 
+    /// Any value, as a C# cast from `int` allows.
+    pub const fn from_bits(bits: u32) -> Self {
+        Self(bits)
+    }
+
     pub const fn bits(self) -> u32 {
         self.0
     }
@@ -42,7 +53,7 @@ impl NumberStyles {
     }
 }
 
-/// The `NumberFormatInfo` fields that parsing reads.
+/// The `NumberFormatInfo` fields that integer parsing reads.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NumberFormat {
     pub positive_sign: NetString,
@@ -52,8 +63,6 @@ pub struct NumberFormat {
     pub currency_symbol: NetString,
     pub currency_decimal_separator: NetString,
     pub currency_group_separator: NetString,
-    /// Only ja-JP and ko-KR have one (a backslash).
-    pub ansi_currency_symbol: Option<NetString>,
     pub number_negative_pattern: i32,
 }
 
@@ -68,9 +77,13 @@ impl NumberFormat {
             currency_symbol: "\u{00A4}".into(),
             currency_decimal_separator: ".".into(),
             currency_group_separator: ",".into(),
-            ansi_currency_symbol: None,
             number_negative_pattern: 1,
         }
+    }
+
+    /// `positiveSign == "+" && negativeSign == "-"`, which picks the fast sign check in the integer-style path.
+    fn has_invariant_signs(&self) -> bool {
+        self.positive_sign == "+" && self.negative_sign == "-"
     }
 }
 
@@ -93,32 +106,32 @@ fn at(s: &[u16], i: usize) -> u16 {
 
 /// `Number.IsWhite`.
 fn is_white(ch: u16) -> bool {
-    ch == 0x20 || (0x09..=0x0D).contains(&ch)
+    ch == 0x20 || ch.wrapping_sub(0x09) <= 0x0D - 0x09
 }
 
+/// `Number.IsDigit`.
 fn is_digit(ch: u16) -> bool {
-    (u16::from(b'0')..=u16::from(b'9')).contains(&ch)
+    ch.wrapping_sub(u16::from(b'0')) <= 9
 }
 
-/// `Number.MatchChars`: the position after `pattern` if it matches at `p`. A space in the input matches a
-/// no-break space in the pattern. An empty pattern never matches.
-fn match_chars(s: &[u16], p: usize, pattern: &[u16]) -> Option<usize> {
+/// `Number.MatchChars`: the position after `pattern` if it matches at `p`. The pattern is read like a C string,
+/// up to its first NUL, and an empty one never matches. A space in the input matches a no-break space in the
+/// pattern.
+fn match_chars(s: &[u16], p: usize, pattern: &NetString) -> Option<usize> {
+    let pattern = pattern.as_units();
+    let pattern = &pattern[..pattern.iter().position(|&c| c == 0).unwrap_or(pattern.len())];
     if pattern.is_empty() {
         return None;
     }
     let mut i = p;
     for &expected in pattern {
-        let ch = at(s, i);
-        if ch != expected && !(expected == 0x00A0 && ch == 0x0020) {
+        let cp = at(s, i);
+        if cp != expected && !(expected == 0x00A0 && cp == 0x0020) {
             return None;
         }
         i += 1;
     }
     Some(i)
-}
-
-fn match_opt(s: &[u16], p: usize, pattern: Option<&NetString>) -> Option<usize> {
-    pattern.and_then(|pattern| match_chars(s, p, pattern.as_units()))
 }
 
 const STATE_SIGN: i32 = 0x0001;
@@ -128,34 +141,30 @@ const STATE_NON_ZERO: i32 = 0x0008;
 const STATE_DECIMAL: i32 = 0x0010;
 const STATE_CURRENCY: i32 = 0x0020;
 
-/// `Number.ParseNumber`. Returns whether it succeeded and where parsing stopped.
+/// `Number.ParseNumber` (never called with `AllowHexSpecifier`). Returns whether it succeeded and where parsing
+/// stopped.
 fn parse_number(
     s: &[u16],
-    options: NumberStyles,
+    styles: NumberStyles,
     number: &mut NumberBuffer,
-    numfmt: &NumberFormat,
+    info: &NumberFormat,
     parse_decimal: bool,
 ) -> (bool, usize) {
     number.scale = 0;
     number.sign = false;
 
     let mut curr_symbol: Option<&NetString> = None;
-    let mut ansicurr_symbol: Option<&NetString> = None;
-    let mut altdec_sep: Option<&NetString> = None;
-    let mut altgroup_sep: Option<&NetString> = None;
     let dec_sep: &NetString;
     let group_sep: &NetString;
-    let parsing_currency = options.has(NumberStyles::ALLOW_CURRENCY_SYMBOL);
+    let parsing_currency = styles.has(NumberStyles::ALLOW_CURRENCY_SYMBOL);
     if parsing_currency {
-        curr_symbol = Some(&numfmt.currency_symbol);
-        ansicurr_symbol = numfmt.ansi_currency_symbol.as_ref();
-        altdec_sep = Some(&numfmt.number_decimal_separator);
-        altgroup_sep = Some(&numfmt.number_group_separator);
-        dec_sep = &numfmt.currency_decimal_separator;
-        group_sep = &numfmt.currency_group_separator;
+        curr_symbol = Some(&info.currency_symbol);
+        // Match the currency separators first and the number separators on failure.
+        dec_sep = &info.currency_decimal_separator;
+        group_sep = &info.currency_group_separator;
     } else {
-        dec_sep = &numfmt.number_decimal_separator;
-        group_sep = &numfmt.number_group_separator;
+        dec_sep = &info.number_decimal_separator;
+        group_sep = &info.number_group_separator;
     }
 
     let mut state = 0;
@@ -163,27 +172,27 @@ fn parse_number(
     let mut ch = at(s, p);
 
     loop {
-        // Whitespace is eaten unless a sign was found that isn't followed by a currency symbol.
-        let white_ok = is_white(ch)
-            && options.has(NumberStyles::ALLOW_LEADING_WHITE)
-            && ((state & STATE_SIGN) == 0
-                || ((state & STATE_CURRENCY) != 0 || numfmt.number_negative_pattern == 2));
-        if !white_ok {
-            let signflag = options.has(NumberStyles::ALLOW_LEADING_SIGN) && (state & STATE_SIGN) == 0;
-            if let Some(next) = match_chars(s, p, numfmt.positive_sign.as_units()).filter(|_| signflag) {
+        // Eat whitespace unless we've found a sign which isn't followed by a currency symbol.
+        if !is_white(ch)
+            || !styles.has(NumberStyles::ALLOW_LEADING_WHITE)
+            || ((state & STATE_SIGN) != 0 && (state & STATE_CURRENCY) == 0 && info.number_negative_pattern != 2)
+        {
+            let sign_allowed = styles.has(NumberStyles::ALLOW_LEADING_SIGN) && (state & STATE_SIGN) == 0;
+            let positive = sign_allowed.then(|| match_chars(s, p, &info.positive_sign)).flatten();
+            let negative = (sign_allowed && positive.is_none()).then(|| match_chars(s, p, &info.negative_sign)).flatten();
+            if let Some(next) = positive.or(negative) {
+                if negative.is_some() {
+                    number.sign = true;
+                }
                 state |= STATE_SIGN;
                 p = next - 1;
-            } else if let Some(next) = match_chars(s, p, numfmt.negative_sign.as_units()).filter(|_| signflag) {
-                state |= STATE_SIGN;
-                number.sign = true;
-                p = next - 1;
-            } else if ch == u16::from(b'(') && options.has(NumberStyles::ALLOW_PARENTHESES) && (state & STATE_SIGN) == 0 {
+            } else if ch == u16::from(b'(') && styles.has(NumberStyles::ALLOW_PARENTHESES) && (state & STATE_SIGN) == 0 {
                 state |= STATE_SIGN | STATE_PARENS;
                 number.sign = true;
-            } else if let Some(next) = match_opt(s, p, curr_symbol).or_else(|| match_opt(s, p, ansicurr_symbol)) {
+            } else if let Some(next) = curr_symbol.and_then(|symbol| match_chars(s, p, symbol)) {
                 state |= STATE_CURRENCY;
+                // There can be only one currency symbol.
                 curr_symbol = None;
-                ansicurr_symbol = None;
                 p = next - 1;
             } else {
                 break;
@@ -196,8 +205,7 @@ fn parse_number(
     let mut dig_count: i32 = 0;
     let mut dig_end: i32 = 0;
     loop {
-        let hex = options.has(NumberStyles::ALLOW_HEX_SPECIFIER);
-        if is_digit(ch) || (hex && (matches!(ch, 0x61..=0x66) || matches!(ch, 0x41..=0x46))) {
+        if is_digit(ch) {
             state |= STATE_DIGITS;
             if ch != u16::from(b'0') || (state & STATE_NON_ZERO) != 0 {
                 if dig_count < NUMBER_MAX_DIGITS {
@@ -214,11 +222,11 @@ fn parse_number(
             } else if (state & STATE_DECIMAL) != 0 {
                 number.scale -= 1;
             }
-        } else if let Some(next) = (options.has(NumberStyles::ALLOW_DECIMAL_POINT) && (state & STATE_DECIMAL) == 0)
+        } else if let Some(next) = (styles.has(NumberStyles::ALLOW_DECIMAL_POINT) && (state & STATE_DECIMAL) == 0)
             .then(|| {
-                match_chars(s, p, dec_sep.as_units()).or_else(|| {
+                match_chars(s, p, dec_sep).or_else(|| {
                     (parsing_currency && (state & STATE_CURRENCY) == 0)
-                        .then(|| match_opt(s, p, altdec_sep))
+                        .then(|| match_chars(s, p, &info.number_decimal_separator))
                         .flatten()
                 })
             })
@@ -226,17 +234,16 @@ fn parse_number(
         {
             state |= STATE_DECIMAL;
             p = next - 1;
-        } else if let Some(next) = (options.has(NumberStyles::ALLOW_THOUSANDS)
-            && (state & STATE_DIGITS) != 0
-            && (state & STATE_DECIMAL) == 0)
-            .then(|| {
-                match_chars(s, p, group_sep.as_units()).or_else(|| {
-                    (parsing_currency && (state & STATE_CURRENCY) == 0)
-                        .then(|| match_opt(s, p, altgroup_sep))
-                        .flatten()
+        } else if let Some(next) =
+            (styles.has(NumberStyles::ALLOW_THOUSANDS) && (state & STATE_DIGITS) != 0 && (state & STATE_DECIMAL) == 0)
+                .then(|| {
+                    match_chars(s, p, group_sep).or_else(|| {
+                        (parsing_currency && (state & STATE_CURRENCY) == 0)
+                            .then(|| match_chars(s, p, &info.number_group_separator))
+                            .flatten()
+                    })
                 })
-            })
-            .flatten()
+                .flatten()
         {
             p = next - 1;
         } else {
@@ -250,15 +257,15 @@ fn parse_number(
     number.digits.truncate(dig_end as usize);
 
     if (state & STATE_DIGITS) != 0 {
-        if (ch == u16::from(b'E') || ch == u16::from(b'e')) && options.has(NumberStyles::ALLOW_EXPONENT) {
+        if (ch == u16::from(b'E') || ch == u16::from(b'e')) && styles.has(NumberStyles::ALLOW_EXPONENT) {
             let temp = p;
             let mut neg_exp = false;
             p += 1;
             ch = at(s, p);
-            if let Some(next) = match_chars(s, p, numfmt.positive_sign.as_units()) {
+            if let Some(next) = match_chars(s, p, &info.positive_sign) {
                 p = next;
                 ch = at(s, p);
-            } else if let Some(next) = match_chars(s, p, numfmt.negative_sign.as_units()) {
+            } else if let Some(next) = match_chars(s, p, &info.negative_sign) {
                 p = next;
                 ch = at(s, p);
                 neg_exp = true;
@@ -291,22 +298,21 @@ fn parse_number(
         }
 
         loop {
-            if is_white(ch) && options.has(NumberStyles::ALLOW_TRAILING_WHITE) {
-                // Nothing to do; advance below.
-            } else {
-                let signflag = options.has(NumberStyles::ALLOW_TRAILING_SIGN) && (state & STATE_SIGN) == 0;
-                if let Some(next) = match_chars(s, p, numfmt.positive_sign.as_units()).filter(|_| signflag) {
+            if !is_white(ch) || !styles.has(NumberStyles::ALLOW_TRAILING_WHITE) {
+                let sign_allowed = styles.has(NumberStyles::ALLOW_TRAILING_SIGN) && (state & STATE_SIGN) == 0;
+                let positive = sign_allowed.then(|| match_chars(s, p, &info.positive_sign)).flatten();
+                let negative =
+                    (sign_allowed && positive.is_none()).then(|| match_chars(s, p, &info.negative_sign)).flatten();
+                if let Some(next) = positive.or(negative) {
+                    if negative.is_some() {
+                        number.sign = true;
+                    }
                     state |= STATE_SIGN;
-                    p = next - 1;
-                } else if let Some(next) = match_chars(s, p, numfmt.negative_sign.as_units()).filter(|_| signflag) {
-                    state |= STATE_SIGN;
-                    number.sign = true;
                     p = next - 1;
                 } else if ch == u16::from(b')') && (state & STATE_PARENS) != 0 {
                     state &= !STATE_PARENS;
-                } else if let Some(next) = match_opt(s, p, curr_symbol).or_else(|| match_opt(s, p, ansicurr_symbol)) {
+                } else if let Some(next) = curr_symbol.and_then(|symbol| match_chars(s, p, symbol)) {
                     curr_symbol = None;
-                    ansicurr_symbol = None;
                     p = next - 1;
                 } else {
                     break;
@@ -332,21 +338,20 @@ fn parse_number(
 }
 
 /// `Number.TrailingZeros`: only NUL characters may follow the number.
-fn trailing_zeros(s: &[u16], index: usize) -> bool {
-    s[index..].iter().all(|&c| c == 0)
+fn trailing_zeros(value: &[u16], index: usize) -> bool {
+    value[index..].iter().all(|&c| c == 0)
 }
 
-/// `Number.TryStringToNumber`. A missing string (C# `null`) fails.
+/// `Number.TryStringToNumber`.
 fn try_string_to_number(
-    s: Option<&NetString>,
-    options: NumberStyles,
-    numfmt: &NumberFormat,
+    value: &[u16],
+    styles: NumberStyles,
+    info: &NumberFormat,
     parse_decimal: bool,
 ) -> Option<NumberBuffer> {
-    let units = s?.as_units();
     let mut number = NumberBuffer::default();
-    let (ok, p) = parse_number(units, options, &mut number, numfmt, parse_decimal);
-    if !ok || (p < units.len() && !trailing_zeros(units, p)) {
+    let (ok, p) = parse_number(value, styles, &mut number, info, parse_decimal);
+    if !ok || (p < value.len() && !trailing_zeros(value, p)) {
         return None;
     }
     Some(number)
@@ -416,55 +421,345 @@ fn number_to_u32(number: &NumberBuffer) -> Option<u32> {
     Some(n)
 }
 
-/// `Number.HexNumberToUInt32`.
-fn hex_number_to_u32(number: &NumberBuffer) -> Option<u32> {
-    let mut i = number.scale;
-    if i > UINT32_PRECISION || i < number.precision {
-        return None;
-    }
-    let mut digits = number.digits.iter();
-    let mut n: u32 = 0;
-    loop {
-        i -= 1;
-        if i < 0 {
-            break;
-        }
-        if n > (0xFFFF_FFFF / 16) {
-            return None;
-        }
-        n = n.wrapping_mul(16);
-        if let Some(&d) = digits.next() {
-            let add = match d {
-                0x30..=0x39 => u32::from(d - 0x30),
-                0x41..=0x46 => u32::from(d - 0x41) + 10,
-                _ => u32::from(d - 0x61) + 10,
-            };
-            let new_n = n.wrapping_add(add);
-            if new_n < n {
-                return None;
-            }
-            n = new_n;
-        }
-    }
-    Some(n)
+/// Where the integer-style parsers end up: `DoneAtEndButPotentialOverflow` or `FalseExit`. Overflow is a failure
+/// for `TryParse` either way; `Parse` would turn it into an `OverflowException` instead of a `FormatException`.
+enum IntegerParse {
+    Done,
+    False,
 }
 
-/// `Number.TryParseInt32` (what `int.TryParse(s, style, provider, out v)` calls).
-pub fn try_parse_i32(s: Option<&NetString>, style: NumberStyles, info: &NumberFormat) -> Option<i32> {
-    let number = try_string_to_number(s, style, info, false)?;
-    if style.has(NumberStyles::ALLOW_HEX_SPECIFIER) {
-        hex_number_to_u32(&number).map(|v| v as i32)
-    } else {
-        number_to_i32(&number)
+/// The shared front of the integer-style parsers: leading whitespace and the sign. Returns where the digits
+/// start (in the possibly re-sliced `value`), whether a negative sign was read, or `None` for `FalseExit`.
+fn integer_style_prefix<'v>(
+    mut value: &'v [u16],
+    styles: NumberStyles,
+    info: &NumberFormat,
+) -> Option<(&'v [u16], usize, bool)> {
+    if value.is_empty() {
+        return None;
     }
+    let mut negative = false;
+    let mut index = 0usize;
+    let mut num = value[0];
+
+    if styles.has(NumberStyles::ALLOW_LEADING_WHITE) && is_white(num) {
+        loop {
+            index += 1;
+            if index >= value.len() {
+                return None;
+            }
+            num = value[index];
+            if !is_white(num) {
+                break;
+            }
+        }
+    }
+
+    if styles.has(NumberStyles::ALLOW_LEADING_SIGN) {
+        if info.has_invariant_signs() {
+            if num == u16::from(b'-') || num == u16::from(b'+') {
+                negative = num == u16::from(b'-');
+                index += 1;
+                if index >= value.len() {
+                    return None;
+                }
+            }
+        } else {
+            value = &value[index..];
+            index = 0;
+            let positive = info.positive_sign.as_units();
+            let negative_sign = info.negative_sign.as_units();
+            // ReadOnlySpan<char>.StartsWith: an ordinal comparison of the whole sign string.
+            if !positive.is_empty() && value.starts_with(positive) {
+                index += positive.len();
+                if index >= value.len() {
+                    return None;
+                }
+            } else if !negative_sign.is_empty() && value.starts_with(negative_sign) {
+                negative = true;
+                index += negative_sign.len();
+                if index >= value.len() {
+                    return None;
+                }
+            }
+        }
+    }
+    Some((value, index, negative))
+}
+
+/// `HasTrailingChars`: trailing whitespace if allowed, then only NULs.
+fn integer_style_trailing(value: &[u16], mut index: usize, styles: NumberStyles) -> IntegerParse {
+    if is_white(value[index]) {
+        if !styles.has(NumberStyles::ALLOW_TRAILING_WHITE) {
+            return IntegerParse::False;
+        }
+        index += 1;
+        while index < value.len() && is_white(value[index]) {
+            index += 1;
+        }
+        if index >= value.len() {
+            return IntegerParse::Done;
+        }
+    }
+    if trailing_zeros(value, index) { IntegerParse::Done } else { IntegerParse::False }
+}
+
+/// Decimal digits for the integer-style parsers: skips leading zeros, then reads up to 10 significant digits.
+/// Returns the low 32 bits of the value, the 10th digit if there was one (for the caller's overflow check), and
+/// whether more digits followed; `None` from the outer option is `FalseExit` (no digit at all).
+fn integer_style_digits(value: &[u16], mut index: usize, styles: NumberStyles) -> Option<(u32, Option<u16>, bool, IntegerParse)> {
+    let mut num = value[index];
+    if !is_digit(num) {
+        return None;
+    }
+    // Skip past leading zeros.
+    if num == u16::from(b'0') {
+        loop {
+            index += 1;
+            if index >= value.len() {
+                return Some((0, None, false, IntegerParse::Done));
+            }
+            num = value[index];
+            if num != u16::from(b'0') {
+                break;
+            }
+        }
+        if !is_digit(num) {
+            return Some((0, None, false, integer_style_trailing(value, index, styles)));
+        }
+    }
+
+    // Up to 9 digits can't overflow.
+    let mut answer = u32::from(num - u16::from(b'0'));
+    index += 1;
+    for _ in 0..8 {
+        if index >= value.len() {
+            return Some((answer, None, false, IntegerParse::Done));
+        }
+        num = value[index];
+        if !is_digit(num) {
+            return Some((answer, None, false, integer_style_trailing(value, index, styles)));
+        }
+        index += 1;
+        answer = answer.wrapping_mul(10).wrapping_add(u32::from(num - u16::from(b'0')));
+    }
+
+    // The 10th digit may overflow; the caller checks.
+    if index >= value.len() {
+        return Some((answer, None, false, IntegerParse::Done));
+    }
+    num = value[index];
+    if !is_digit(num) {
+        return Some((answer, None, false, integer_style_trailing(value, index, styles)));
+    }
+    index += 1;
+    let tenth = num;
+    if index >= value.len() {
+        return Some((answer, Some(tenth), false, IntegerParse::Done));
+    }
+
+    // Any further digit overflows, but format errors take precedence for compatibility.
+    num = value[index];
+    let mut more = false;
+    while is_digit(num) {
+        more = true;
+        index += 1;
+        if index >= value.len() {
+            return Some((answer, Some(tenth), more, IntegerParse::Done));
+        }
+        num = value[index];
+    }
+    Some((answer, Some(tenth), more, integer_style_trailing(value, index, styles)))
+}
+
+/// `Number.TryParseInt32IntegerStyle`.
+fn try_parse_int32_integer_style(value: &[u16], styles: NumberStyles, info: &NumberFormat) -> Option<i32> {
+    let (value, index, negative) = integer_style_prefix(value, styles, info)?;
+    let sign: i32 = if negative { -1 } else { 1 };
+    let (nine_digits, tenth, more, end) = integer_style_digits(value, index, styles)?;
+
+    let mut overflow = more;
+    let mut answer = nine_digits as i32;
+    if let Some(tenth) = tenth {
+        if answer > i32::MAX / 10 {
+            overflow = true;
+        }
+        answer = answer.wrapping_mul(10).wrapping_add(i32::from(tenth - u16::from(b'0')));
+        // (uint)answer > (uint)int.MaxValue + (-1 * sign + 1) / 2
+        if answer as u32 > (i32::MAX as u32).wrapping_add(((-sign + 1) / 2) as u32) {
+            overflow = true;
+        }
+    }
+    match end {
+        IntegerParse::Done if !overflow => Some(answer.wrapping_mul(sign)),
+        _ => None,
+    }
+}
+
+/// `Number.TryParseUInt32IntegerStyle`.
+fn try_parse_uint32_integer_style(value: &[u16], styles: NumberStyles, info: &NumberFormat) -> Option<u32> {
+    let (value, index, has_negative_sign) = integer_style_prefix(value, styles, info)?;
+    let (nine_digits, tenth, more, end) = integer_style_digits(value, index, styles)?;
+
+    let mut overflow = more;
+    let mut answer = nine_digits;
+    if let Some(tenth) = tenth {
+        if answer > u32::MAX / 10 || (answer == u32::MAX / 10 && tenth > u16::from(b'5')) {
+            overflow = true;
+        }
+        answer = answer.wrapping_mul(10).wrapping_add(u32::from(tenth - u16::from(b'0')));
+    }
+    match end {
+        // A negative sign is only allowed on zero.
+        IntegerParse::Done if !overflow && !(has_negative_sign && answer != 0) => Some(answer),
+        _ => None,
+    }
+}
+
+/// `s_charToHexLookup[num]` for `num` below 256: the value of an ASCII hex digit.
+fn hex_value(num: u16) -> Option<u32> {
+    match num {
+        0x30..=0x39 => Some(u32::from(num - 0x30)),
+        0x41..=0x46 => Some(u32::from(num - 0x41) + 10),
+        0x61..=0x66 => Some(u32::from(num - 0x61) + 10),
+        _ => None,
+    }
+}
+
+/// `Number.TryParseUInt32HexNumberStyle`.
+fn try_parse_uint32_hex_number_style(value: &[u16], styles: NumberStyles) -> Option<u32> {
+    if value.is_empty() {
+        return None;
+    }
+    let mut index = 0usize;
+    let mut num = value[0];
+
+    if styles.has(NumberStyles::ALLOW_LEADING_WHITE) && is_white(num) {
+        loop {
+            index += 1;
+            if index >= value.len() {
+                return None;
+            }
+            num = value[index];
+            if !is_white(num) {
+                break;
+            }
+        }
+    }
+
+    // Not a hex digit: FalseExit.
+    hex_value(num)?;
+    let mut overflow = false;
+    let mut answer: u32 = 0;
+    let end = 'digits: {
+        // Skip past leading zeros.
+        if num == u16::from(b'0') {
+            loop {
+                index += 1;
+                if index >= value.len() {
+                    return Some(0);
+                }
+                num = value[index];
+                if num != u16::from(b'0') {
+                    break;
+                }
+            }
+        }
+        // Without leading zeros `num` is the hex digit checked above; after them it may be anything.
+        let Some(first_digit) = hex_value(num) else {
+            break 'digits integer_style_trailing(value, index, styles);
+        };
+
+        // Up to 8 digits can't overflow.
+        answer = first_digit;
+        index += 1;
+        for _ in 0..7 {
+            if index >= value.len() {
+                return Some(answer);
+            }
+            num = value[index];
+            let Some(digit) = hex_value(num) else {
+                break 'digits integer_style_trailing(value, index, styles);
+            };
+            index += 1;
+            answer = answer.wrapping_mul(16).wrapping_add(digit);
+        }
+
+        // Another digit is an overflow.
+        if index >= value.len() {
+            return Some(answer);
+        }
+        num = value[index];
+        if hex_value(num).is_none() {
+            break 'digits integer_style_trailing(value, index, styles);
+        }
+        index += 1;
+        overflow = true;
+        if index >= value.len() {
+            break 'digits IntegerParse::Done;
+        }
+
+        // Format errors take precedence: read through any remaining digits.
+        num = value[index];
+        while hex_value(num).is_some() {
+            index += 1;
+            if index >= value.len() {
+                break 'digits IntegerParse::Done;
+            }
+            num = value[index];
+        }
+        integer_style_trailing(value, index, styles)
+    };
+
+    match end {
+        IntegerParse::Done if !overflow => Some(answer),
+        _ => None,
+    }
+}
+
+/// `Number.TryParseInt32`.
+fn number_try_parse_int32(value: &[u16], styles: NumberStyles, info: &NumberFormat) -> Option<i32> {
+    if styles.bits() & !NumberStyles::INTEGER.bits() == 0 {
+        return try_parse_int32_integer_style(value, styles, info);
+    }
+    if styles.has(NumberStyles::ALLOW_HEX_SPECIFIER) {
+        return try_parse_uint32_hex_number_style(value, styles).map(|v| v as i32);
+    }
+    number_to_i32(&try_string_to_number(value, styles, info, false)?)
 }
 
 /// `Number.TryParseUInt32`.
-pub fn try_parse_u32(s: Option<&NetString>, style: NumberStyles, info: &NumberFormat) -> Option<u32> {
-    let number = try_string_to_number(s, style, info, false)?;
-    if style.has(NumberStyles::ALLOW_HEX_SPECIFIER) {
-        hex_number_to_u32(&number)
-    } else {
-        number_to_u32(&number)
+fn number_try_parse_uint32(value: &[u16], styles: NumberStyles, info: &NumberFormat) -> Option<u32> {
+    if styles.bits() & !NumberStyles::INTEGER.bits() == 0 {
+        return try_parse_uint32_integer_style(value, styles, info);
     }
+    if styles.has(NumberStyles::ALLOW_HEX_SPECIFIER) {
+        return try_parse_uint32_hex_number_style(value, styles);
+    }
+    number_to_u32(&try_string_to_number(value, styles, info, false)?)
+}
+
+/// `NumberFormatInfo.ValidateParseStyleInteger` (reference source).
+fn validate_parse_style_integer(style: NumberStyles) -> Result<(), MonoException> {
+    // InvalidNumberStyles: every bit above AllowHexSpecifier.
+    if style.bits() & !0x3FF != 0 {
+        return Err(MonoException::argument(sr::ARGUMENT_INVALID_NUMBER_STYLES, Some("style")));
+    }
+    if style.has(NumberStyles::ALLOW_HEX_SPECIFIER) && style.bits() & !NumberStyles::HEX_NUMBER.bits() != 0 {
+        return Err(MonoException::argument(sr::ARG_INVALID_HEX_STYLE, None));
+    }
+    Ok(())
+}
+
+/// `Int32.TryParse(string s, NumberStyles style, IFormatProvider provider, out int result)`: an invalid style
+/// throws (even for a null `s`); otherwise `Ok(None)` is `false`. A missing string (C# `null`) fails.
+pub fn try_parse_i32(s: Option<&NetString>, style: NumberStyles, info: &NumberFormat) -> Result<Option<i32>, MonoException> {
+    validate_parse_style_integer(style)?;
+    Ok(s.and_then(|s| number_try_parse_int32(s.as_units(), style, info)))
+}
+
+/// `UInt32.TryParse(string s, NumberStyles style, IFormatProvider provider, out uint result)`.
+pub fn try_parse_u32(s: Option<&NetString>, style: NumberStyles, info: &NumberFormat) -> Result<Option<u32>, MonoException> {
+    validate_parse_style_integer(style)?;
+    Ok(s.and_then(|s| number_try_parse_uint32(s.as_units(), style, info)))
 }

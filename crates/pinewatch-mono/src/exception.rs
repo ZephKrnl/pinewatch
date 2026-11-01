@@ -1,4 +1,13 @@
+// `ArgumentException.Message` and the default messages are ported from corefx `src/Common/src/CoreLib/System/`
+// (mono/corefx 5b4edb9b). Copyright (c) .NET Foundation and Contributors. MIT license; see NOTICES-PORTED-CODE.md.
+
 use std::fmt;
+
+use crate::sr;
+
+/// `Environment.NewLine`: Mono's `GetNewLine` icall returns `"\r\n"` on Windows (`mono/metadata/icall-windows.c`)
+/// and `"\n"` elsewhere. `ArgumentException.Message` puts it before the `Parameter name:` line.
+pub const NEW_LINE: &str = if cfg!(windows) { "\r\n" } else { "\n" };
 
 /// The .NET exception types that ported code can raise.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -10,7 +19,6 @@ pub enum ExceptionKind {
     IndexOutOfRange,
     InvalidCast,
     Io,
-    NotImplemented,
     NullReference,
     OutOfMemory,
     Overflow,
@@ -27,7 +35,6 @@ impl ExceptionKind {
             Self::IndexOutOfRange => "System.IndexOutOfRangeException",
             Self::InvalidCast => "System.InvalidCastException",
             Self::Io => "System.IO.IOException",
-            Self::NotImplemented => "System.NotImplementedException",
             Self::NullReference => "System.NullReferenceException",
             Self::OutOfMemory => "System.OutOfMemoryException",
             Self::Overflow => "System.OverflowException",
@@ -40,59 +47,110 @@ impl ExceptionKind {
     }
 }
 
-/// A .NET exception: its type and its exact message.
+/// A .NET exception: its type, its exact `Message`, and the exception it wraps (`InnerException`), if any.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MonoException {
     pub kind: ExceptionKind,
     pub message: String,
+    pub inner: Option<Box<MonoException>>,
+}
+
+/// `ArgumentException.Message` (corefx): the message, then `Environment.NewLine` and `Parameter name: <name>` when
+/// the parameter name is neither null nor empty.
+fn with_param_name(message: &str, param_name: Option<&str>) -> String {
+    match param_name {
+        Some(name) if !name.is_empty() => {
+            format!("{message}{NEW_LINE}{}", sr::ARG_PARAM_NAME_NAME.replace("{0}", name))
+        }
+        _ => message.to_string(),
+    }
 }
 
 impl MonoException {
     pub fn new(kind: ExceptionKind, message: impl Into<String>) -> Self {
-        Self { kind, message: message.into() }
+        Self { kind, message: message.into(), inner: None }
     }
 
+    /// The same exception with `inner` as its `InnerException`.
+    pub fn with_inner(mut self, inner: MonoException) -> Self {
+        self.inner = Some(Box::new(inner));
+        self
+    }
+
+    /// `new FormatException(message)`.
     pub fn format(message: impl Into<String>) -> Self {
         Self::new(ExceptionKind::Format, message)
     }
 
-    /// The Mono runtime's message for dereferencing null.
-    pub fn null_reference() -> Self {
-        Self::new(ExceptionKind::NullReference, "Object reference not set to an instance of an object")
+    /// `new OverflowException(message)`.
+    pub fn overflow_message(message: impl Into<String>) -> Self {
+        Self::new(ExceptionKind::Overflow, message)
     }
 
-    /// The Mono runtime's message for a failed cast or unboxing.
+    /// `new ArgumentException(message, paramName)`; `None` is the one-argument constructor.
+    pub fn argument(message: &str, param_name: Option<&str>) -> Self {
+        Self::new(ExceptionKind::Argument, with_param_name(message, param_name))
+    }
+
+    /// What the runtime throws for dereferencing null. Mono creates runtime exceptions with their default
+    /// constructor (`mono_exception_from_name`), so this is `new NullReferenceException()`.
+    pub fn null_reference() -> Self {
+        Self::new(ExceptionKind::NullReference, sr::ARG_NULL_REFERENCE_EXCEPTION)
+    }
+
+    /// What the runtime throws for a failed cast or unboxing: `new InvalidCastException()`.
     pub fn invalid_cast() -> Self {
-        Self::new(ExceptionKind::InvalidCast, "Specified cast is not valid.")
+        Self::new(ExceptionKind::InvalidCast, sr::ARG_INVALID_CAST_EXCEPTION)
     }
 
     /// `new OverflowException()`.
     pub fn overflow() -> Self {
-        Self::new(ExceptionKind::Overflow, "Arithmetic operation resulted in an overflow.")
+        Self::new(ExceptionKind::Overflow, sr::ARG_OVERFLOW_EXCEPTION)
     }
 
-    /// What a C# string or array indexer throws when out of range.
+    /// What an array indexer, or a span indexer, throws when out of range: `new IndexOutOfRangeException()`.
     pub fn index_out_of_range() -> Self {
-        Self::new(ExceptionKind::IndexOutOfRange, "Index was outside the bounds of the array.")
+        Self::new(ExceptionKind::IndexOutOfRange, sr::ARG_INDEX_OUT_OF_RANGE_EXCEPTION)
+    }
+
+    /// `new ArgumentOutOfRangeException()`, as span slicing throws it.
+    pub fn argument_out_of_range_default() -> Self {
+        Self::new(ExceptionKind::ArgumentOutOfRange, sr::ARG_ARGUMENT_OUT_OF_RANGE_EXCEPTION)
     }
 
     /// `new ArgumentOutOfRangeException(paramName)`.
     pub fn argument_out_of_range(param_name: &str) -> Self {
         Self::new(
             ExceptionKind::ArgumentOutOfRange,
-            format!("Specified argument was out of the range of valid values.\nParameter name: {param_name}"),
+            with_param_name(sr::ARG_ARGUMENT_OUT_OF_RANGE_EXCEPTION, Some(param_name)),
         )
+    }
+
+    /// `new ArgumentOutOfRangeException(paramName, message)`.
+    pub fn argument_out_of_range_message(param_name: &str, message: &str) -> Self {
+        Self::new(ExceptionKind::ArgumentOutOfRange, with_param_name(message, Some(param_name)))
+    }
+
+    /// `ThrowHelper.ThrowArgumentOutOfRange_IndexException()`, which `List<T>`'s indexer throws.
+    pub fn list_index_out_of_range() -> Self {
+        Self::argument_out_of_range_message("index", sr::ARGUMENT_OUT_OF_RANGE_INDEX)
     }
 
     /// `new ArgumentNullException(paramName)`.
     pub fn argument_null(param_name: &str) -> Self {
-        Self::new(ExceptionKind::ArgumentNull, format!("Value cannot be null.\nParameter name: {param_name}"))
+        Self::new(ExceptionKind::ArgumentNull, with_param_name(sr::ARGUMENT_NULL_GENERIC, Some(param_name)))
     }
 }
 
+/// `Type: message`, followed by ` ---> ` and the inner exception when there is one. This is Pinewatch's own
+/// error text; logged C# exceptions (`Exception.ToString()`) are reproduced where their catch sites are ported.
 impl fmt::Display for MonoException {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}: {}", self.kind.type_name(), self.message)
+        write!(f, "{}: {}", self.kind.type_name(), self.message)?;
+        if let Some(inner) = &self.inner {
+            write!(f, " ---> {inner}")?;
+        }
+        Ok(())
     }
 }
 

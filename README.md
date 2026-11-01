@@ -20,6 +20,9 @@ subscription services.
 **Game content.** Pinewatch ships no Unturned game content: no models, textures, sounds, maps or data files. It reads
 that content from your own installation of Unturned and never modifies it.
 
+**Ported code.** Parts of `crates/pinewatch-mono` are ports of MIT-licensed .NET class-library code (corefx, corert
+and the .NET Framework reference source). Their license notices are in `NOTICES-PORTED-CODE.md`.
+
 ## Status
 
 Early development, milestone M1: Pinewatch boots, finds your Unturned installation and renders a map's terrain
@@ -63,6 +66,7 @@ Tests that read the real game files run when an install is found and are skipped
 | `crates/` | Pinewatch's Rust crates |
 | `docs/` | Architecture, survey, format inventory, specs and plans |
 | `COMPATIBILITY.md` | The 1:1 compatibility rules and every known limitation |
+| `NOTICES-PORTED-CODE.md` | License notices for the ported .NET class-library code |
 | `reference/u3-sdk` | The U3 SDK source, pinned to tag `v3.26.3.12` (reference only, never edited) |
 
 This repository is local and private. Git is used for version control only; nothing is pushed anywhere.

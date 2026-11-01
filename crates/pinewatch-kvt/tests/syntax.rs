@@ -2,7 +2,7 @@
 //! and the type readers `Level.hierarchy` uses.
 
 use pinewatch_kvt::{KvtCursor, KvtTable, KvtValue, read_kvt};
-use pinewatch_mono::{ExceptionKind, Guid, NetString};
+use pinewatch_mono::{ExceptionKind, Guid, MonoException, NetString, sr};
 
 fn read(text: &str) -> KvtTable {
     read_kvt(&NetString::from_str(text)).expect("parses")
@@ -134,7 +134,7 @@ fn open_brace_after_string_value_throws_invalid_cast() {
 fn array_length_of_a_string_throws_null_reference() {
     let t = read("\"A\" \"1\"");
     let mut c = KvtCursor::new(&t);
-    assert_eq!(c.read_array_length("A").unwrap_err().kind, ExceptionKind::NullReference);
+    assert_eq!(c.read_array_length("A").unwrap_err(), MonoException::null_reference());
     assert_eq!(c.read_array_length("Missing").unwrap(), 0);
 }
 
@@ -153,14 +153,14 @@ fn list_index_out_of_range_throws() {
     let mut c = KvtCursor::new(&t);
     c.read_key("L");
     c.read_array_index(1);
-    assert_eq!(c.read_value().unwrap_err().kind, ExceptionKind::ArgumentOutOfRange);
+    assert_eq!(c.read_value().unwrap_err(), MonoException::list_index_out_of_range());
 }
 
 #[test]
 fn reading_without_a_key_throws_argument_null() {
     let t = read("\"A\" \"1\"");
     let mut c = KvtCursor::new(&t);
-    assert_eq!(c.read_value().unwrap_err().kind, ExceptionKind::ArgumentNull);
+    assert_eq!(c.read_value().unwrap_err(), MonoException::argument_null("key"));
 }
 
 #[test]
@@ -201,7 +201,7 @@ fn guid_reader() {
     assert_eq!(c.read_guid().unwrap().to_string_n(), "53d3ea4a555c44d1824b495c2b337aec");
     c.read_key("X");
     let err = c.read_guid().unwrap_err();
-    assert_eq!((err.kind, err.message.as_str()), (ExceptionKind::Format, "Format_GuidInvLen"));
+    assert_eq!((err.kind, err.message.as_str()), (ExceptionKind::Format, sr::FORMAT_GUID_INV_LEN));
 }
 
 #[test]

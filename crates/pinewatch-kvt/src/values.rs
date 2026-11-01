@@ -1,6 +1,6 @@
 //! The `IFormattedFileReader` methods of `KeyValueTableReader`, plus the type readers `Level.hierarchy` uses.
 
-use pinewatch_mono::{ExceptionKind, Guid, MonoException, NetString, NumberFormat, NumberStyles, try_parse_i32, try_parse_u32};
+use pinewatch_mono::{Guid, MonoException, NetString, NumberFormat, NumberStyles, try_parse_i32, try_parse_u32};
 
 use crate::reader::{KvtTable, KvtValue};
 
@@ -9,14 +9,6 @@ use crate::reader::{KvtTable, KvtValue};
 #[derive(Debug, Clone, Copy)]
 pub struct KvtCursor<'a> {
     table: &'a KvtTable,
-}
-
-/// `List<object>`'s indexer message for an index out of range.
-fn list_index_out_of_range() -> MonoException {
-    MonoException::new(
-        ExceptionKind::ArgumentOutOfRange,
-        "Index was out of range. Must be non-negative and less than the size of the collection.\nParameter name: index",
-    )
 }
 
 /// `DatValue.INVALID_TYPE_CHARS`.
@@ -101,7 +93,7 @@ impl<'a> KvtCursor<'a> {
                 .ok()
                 .and_then(|i| items.get(i))
                 .map(Some)
-                .ok_or_else(list_index_out_of_range),
+                .ok_or_else(MonoException::list_index_out_of_range),
             _ => Err(MonoException::null_reference()),
         }
     }
@@ -144,13 +136,13 @@ impl<'a> KvtCursor<'a> {
     /// `KeyValueTableIntReader`: `int.TryParse(value, NumberStyles.Any, InvariantCulture)`, 0 on failure.
     pub fn read_i32(&mut self) -> Result<i32, MonoException> {
         let value = self.read_value()?;
-        Ok(try_parse_i32(value.as_ref(), NumberStyles::ANY, &NumberFormat::invariant()).unwrap_or(0))
+        Ok(try_parse_i32(value.as_ref(), NumberStyles::ANY, &NumberFormat::invariant())?.unwrap_or(0))
     }
 
     /// `KeyValueTableUIntReader`.
     pub fn read_u32(&mut self) -> Result<u32, MonoException> {
         let value = self.read_value()?;
-        Ok(try_parse_u32(value.as_ref(), NumberStyles::ANY, &NumberFormat::invariant()).unwrap_or(0))
+        Ok(try_parse_u32(value.as_ref(), NumberStyles::ANY, &NumberFormat::invariant())?.unwrap_or(0))
     }
 
     /// `KeyValueTableGUIDReader`: empty, missing or `"0"` is `Guid.Empty`; otherwise `new Guid(value)`.
