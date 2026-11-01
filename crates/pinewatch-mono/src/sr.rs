@@ -14,6 +14,8 @@
 
 pub const ARG_ARGUMENT_OUT_OF_RANGE_EXCEPTION: &str = "Specified argument was out of the range of valid values.";
 pub const ARG_CANNOT_HAVE_NEGATIVE_VALUE: &str = "String cannot contain a minus sign if the base is not 10.";
+pub const ARG_HEX_STYLE_NOT_SUPPORTED: &str =
+    "The number style AllowHexSpecifier is not supported on floating point data types.";
 pub const ARG_INDEX_OUT_OF_RANGE_EXCEPTION: &str = "Index was outside the bounds of the array.";
 pub const ARG_INVALID_BASE: &str = "Invalid Base.";
 pub const ARG_INVALID_CAST_EXCEPTION: &str = "Specified cast is not valid.";
@@ -56,6 +58,7 @@ pub const OVERFLOW_UINT64: &str = "Value was either too large or too small for a
 pub const ALL: &[&str] = &[
     ARG_ARGUMENT_OUT_OF_RANGE_EXCEPTION,
     ARG_CANNOT_HAVE_NEGATIVE_VALUE,
+    ARG_HEX_STYLE_NOT_SUPPORTED,
     ARG_INDEX_OUT_OF_RANGE_EXCEPTION,
     ARG_INVALID_BASE,
     ARG_INVALID_CAST_EXCEPTION,

@@ -80,6 +80,12 @@ isn't set up. Each entry says what the Rust code does, where the behavior came f
   value. An odd trailing byte, a trailing high surrogate and a partial UTF-32 group are dropped. **Check:**
   generated inputs.
 
+- **V16. Float conversion.** `float` and `double` parsing is ported from corefx `Single.TryParse` and
+  `Double.TryParse` over corert's `TryParseSingle`, `TryParseDouble` and the portable `NumberToDouble`
+  (`Number.CoreRT.cs`), which the shipped IL has as managed code. Only the first 18 significant digits count, the
+  value is rounded once to 53 bits, and `float` is the cast of that `double`. NaN has the C# constants' bits.
+  **Check:** a harness sweep of generated decimals near rounding boundaries, long digit strings and denormals.
+
 ## `pinewatch-kvt`
 
 - **V9. Hierarchy hash (later step).** `LevelHierarchy.load` hashes the bytes its `StreamReader` pulled through

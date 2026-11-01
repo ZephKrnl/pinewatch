@@ -1,16 +1,18 @@
 // Ported from corert `src/System.Private.CoreLib/shared/System/Number.Parsing.cs` (mono/corert 11136ad5), corefx
-// `SByte.cs`, `Byte.cs`, `Int16.cs`, `UInt16.cs`, `Int32.cs`, `UInt32.cs`, `Int64.cs` and `UInt64.cs`
-// (mono/corefx 5b4edb9b): Copyright (c) .NET Foundation and Contributors.
-// `NumberFormatInfo.ValidateParseStyleInteger` from reference source `numberformatinfo.cs`: Copyright (c) Microsoft
+// `SByte.cs`, `Byte.cs`, `Int16.cs`, `UInt16.cs`, `Int32.cs`, `UInt32.cs`, `Int64.cs`, `UInt64.cs`, `Single.cs` and
+// `Double.cs` (mono/corefx 5b4edb9b): Copyright (c) .NET Foundation and Contributors.
+// `NumberFormatInfo.ValidateParseStyleInteger` and `ValidateParseStyleFloatingPoint` from reference source
+// `numberformatinfo.cs`: Copyright (c) Microsoft
 // Corporation. MIT license; see NOTICES-PORTED-CODE.md.
 
-//! Integer parsing: `TryParse` with a style and a format provider for every integer width.
+//! Number parsing: `TryParse` with a style and a format provider for every integer width, `float` and `double`.
 //!
 //! As in corert, styles within `NumberStyles.Integer` take an optimized path, hexadecimal styles take their own,
 //! and everything else goes through the `ParseNumber` state machine. A C# `char*` walk reads `'\0'` past the
 //! end; [`at`] returns 0 there, the same sentinel.
 
-use crate::{MonoException, NetString, sr};
+use crate::number_to_double::number_to_double;
+use crate::{MonoException, NetString, chars, sr};
 
 /// `System.Globalization.NumberStyles`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -54,7 +56,7 @@ impl NumberStyles {
     }
 }
 
-/// The `NumberFormatInfo` fields that integer parsing reads.
+/// The `NumberFormatInfo` fields that number parsing reads.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NumberFormat {
     pub positive_sign: NetString,
@@ -65,6 +67,9 @@ pub struct NumberFormat {
     pub currency_decimal_separator: NetString,
     pub currency_group_separator: NetString,
     pub number_negative_pattern: i32,
+    pub positive_infinity_symbol: NetString,
+    pub negative_infinity_symbol: NetString,
+    pub nan_symbol: NetString,
 }
 
 impl NumberFormat {
@@ -79,6 +84,9 @@ impl NumberFormat {
             currency_decimal_separator: ".".into(),
             currency_group_separator: ",".into(),
             number_negative_pattern: 1,
+            positive_infinity_symbol: "Infinity".into(),
+            negative_infinity_symbol: "-Infinity".into(),
+            nan_symbol: "NaN".into(),
         }
     }
 
@@ -947,4 +955,95 @@ pub fn try_parse_i64(s: Option<&NetString>, style: NumberStyles, info: &NumberFo
 pub fn try_parse_u64(s: Option<&NetString>, style: NumberStyles, info: &NumberFormat) -> Result<Option<u64>, MonoException> {
     validate_parse_style_integer(style)?;
     Ok(s.and_then(|s| number_try_parse_uint64(s.as_units(), style, info)))
+}
+
+/// `Number.NumberBufferToDouble`: fails for an infinite result and turns -0.0 into 0.0.
+fn number_buffer_to_double(number: &NumberBuffer) -> Option<f64> {
+    let d = number_to_double(&number.digits, number.scale, number.sign);
+    if !d.is_finite() {
+        return None;
+    }
+    Some(if d == 0.0 { 0.0 } else { d })
+}
+
+/// `Number.TryParseDouble`.
+fn number_try_parse_double(value: &[u16], styles: NumberStyles, info: &NumberFormat) -> Option<f64> {
+    let number = try_string_to_number(value, styles, info, false)?;
+    number_buffer_to_double(&number)
+}
+
+/// `Number.TryParseSingle`: the `(float)` cast of the double, which fails when the cast is infinite.
+fn number_try_parse_single(value: &[u16], styles: NumberStyles, info: &NumberFormat) -> Option<f32> {
+    let cast = number_try_parse_double(value, styles, info)? as f32;
+    if cast.is_infinite() {
+        return None;
+    }
+    Some(cast)
+}
+
+/// `NumberFormatInfo.ValidateParseStyleFloatingPoint` (reference source).
+fn validate_parse_style_floating_point(style: NumberStyles) -> Result<(), MonoException> {
+    if style.bits() & !0x3FF != 0 {
+        return Err(MonoException::argument(sr::ARGUMENT_INVALID_NUMBER_STYLES, Some("style")));
+    }
+    if style.has(NumberStyles::ALLOW_HEX_SPECIFIER) {
+        return Err(MonoException::argument(sr::ARG_HEX_STYLE_NOT_SUPPORTED, None));
+    }
+    Ok(())
+}
+
+/// `Double.NaN` and `Single.NaN` as the compiled constants hold them: `0.0 / 0.0` folded at compile time, a negative
+/// quiet NaN (`ldc.r8` and `ldc.r4` in the shipped `Double.TryParse` and `Single.TryParse`).
+const DOUBLE_NAN_BITS: u64 = 0xFFF8_0000_0000_0000;
+const SINGLE_NAN_BITS: u32 = 0xFFC0_0000;
+
+/// The fallback of `Double.TryParse` and `Single.TryParse` when number parsing fails: the input, trimmed with
+/// `char.IsWhiteSpace`, equal (ordinal) to the positive infinity, negative infinity or NaN symbol, in that order.
+fn special_symbol(value: &[u16], info: &NumberFormat) -> Option<SpecialValue> {
+    let start = value.iter().position(|&c| !chars::is_white_space(c)).unwrap_or(value.len());
+    let end = value.iter().rposition(|&c| !chars::is_white_space(c)).map_or(start, |i| i + 1);
+    let trimmed = &value[start..end.max(start)];
+    if trimmed == info.positive_infinity_symbol.as_units() {
+        Some(SpecialValue::PositiveInfinity)
+    } else if trimmed == info.negative_infinity_symbol.as_units() {
+        Some(SpecialValue::NegativeInfinity)
+    } else if trimmed == info.nan_symbol.as_units() {
+        Some(SpecialValue::NaN)
+    } else {
+        None
+    }
+}
+
+enum SpecialValue {
+    PositiveInfinity,
+    NegativeInfinity,
+    NaN,
+}
+
+/// `Double.TryParse(string s, NumberStyles style, IFormatProvider provider, out double result)`.
+pub fn try_parse_f64(s: Option<&NetString>, style: NumberStyles, info: &NumberFormat) -> Result<Option<f64>, MonoException> {
+    validate_parse_style_floating_point(style)?;
+    let Some(s) = s else { return Ok(None) };
+    let value = s.as_units();
+    Ok(number_try_parse_double(value, style, info).or_else(|| {
+        special_symbol(value, info).map(|special| match special {
+            SpecialValue::PositiveInfinity => f64::INFINITY,
+            SpecialValue::NegativeInfinity => f64::NEG_INFINITY,
+            SpecialValue::NaN => f64::from_bits(DOUBLE_NAN_BITS),
+        })
+    }))
+}
+
+/// `Single.TryParse(string s, NumberStyles style, IFormatProvider provider, out float result)`.
+pub fn try_parse_f32(s: Option<&NetString>, style: NumberStyles, info: &NumberFormat) -> Result<Option<f32>, MonoException> {
+    validate_parse_style_floating_point(style)?;
+    let Some(s) = s else { return Ok(None) };
+    let value = s.as_units();
+    Ok(number_try_parse_single(value, style, info).or_else(|| {
+        special_symbol(value, info).map(|special| match special {
+            SpecialValue::PositiveInfinity => f32::INFINITY,
+            SpecialValue::NegativeInfinity => f32::NEG_INFINITY,
+            SpecialValue::NaN => f32::from_bits(SINGLE_NAN_BITS),
+        })
+    }))
 }

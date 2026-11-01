@@ -9,6 +9,7 @@ mod exception;
 mod guid;
 mod net_string;
 mod number;
+mod number_to_double;
 mod parse_numbers;
 pub mod sr;
 mod text;
@@ -17,7 +18,7 @@ pub use exception::{ExceptionKind, MonoException, NEW_LINE};
 pub use guid::Guid;
 pub use net_string::NetString;
 pub use number::{
-    NumberFormat, NumberStyles, try_parse_i8, try_parse_i16, try_parse_i32, try_parse_i64, try_parse_u8, try_parse_u16,
-    try_parse_u32, try_parse_u64,
+    NumberFormat, NumberStyles, try_parse_f32, try_parse_f64, try_parse_i8, try_parse_i16, try_parse_i32, try_parse_i64,
+    try_parse_u8, try_parse_u16, try_parse_u32, try_parse_u64,
 };
 pub use text::decode_stream_reader_default;
