@@ -1,3 +1,6 @@
+// `index_of_from` follows corefx `src/Common/src/CoreLib/System/String.Searching.cs` (mono/corefx 5b4edb9b).
+// Copyright (c) .NET Foundation and Contributors. MIT license; see NOTICES-PORTED-CODE.md.
+
 //! `UnityDatEx` (UnturnedDat/UnityDatEx.cs): vectors as `x, y[, z]` text, optionally in parentheses, or as a
 //! dictionary with `X`, `Y` and `Z` keys.
 //!

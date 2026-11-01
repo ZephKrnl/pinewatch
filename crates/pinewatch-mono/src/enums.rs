@@ -76,15 +76,15 @@ pub fn try_parse_enum(info: &EnumInfo, value: Option<&NetString>, ignore_case: b
         return None;
     }
 
+    // When the number doesn't parse, the C# falls through to the name lookup after a FormatException and fails
+    // after an OverflowException. A string starting with a digit or a sign never matches a member name (C#
+    // identifiers can't start with one), so both fail. `char.IsDigit` also accepts non-ASCII digits, which can't
+    // parse as a number and can't start a name either, so testing ASCII digits gives the same results.
     let first = value[0];
-    if (u16::from(b'0')..=u16::from(b'9')).contains(&first) || first == u16::from(b'-') || first == u16::from(b'+') {
-        if let Some(bits) = parse_underlying(info.underlying, &NetString::from_units(value.to_vec())) {
-            return Some(bits);
-        }
-        // The C# falls through to the name lookup after a FormatException and fails after an OverflowException.
-        // A string starting with a digit or a sign never matches a member name (C# identifiers can't start with
-        // one), so both fail. `char.IsDigit` also accepts non-ASCII digits, which can't parse as a number and
-        // can't start a name either, so testing ASCII digits gives the same results.
+    if ((u16::from(b'0')..=u16::from(b'9')).contains(&first) || first == u16::from(b'-') || first == u16::from(b'+'))
+        && let Some(bits) = parse_underlying(info.underlying, &NetString::from_units(value.to_vec()))
+    {
+        return Some(bits);
     }
 
     let members = ordered_members(info);

@@ -4469,6 +4469,7 @@ dependencies = [
 name = "pinewatch-dat"
 version = "0.1.0"
 dependencies = [
+ "pinewatch-io",
  "pinewatch-mono",
  "pinewatch-unity",
 ]

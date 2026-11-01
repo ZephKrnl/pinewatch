@@ -9,3 +9,6 @@ publish.workspace = true
 [dependencies]
 pinewatch-mono.workspace = true
 pinewatch-unity.workspace = true
+
+[dev-dependencies]
+pinewatch-io.workspace = true

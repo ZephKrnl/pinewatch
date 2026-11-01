@@ -1,3 +1,6 @@
+// `single_equals` follows corefx `src/Common/src/CoreLib/System/Single.cs` (mono/corefx 5b4edb9b).
+// Copyright (c) .NET Foundation and Contributors. MIT license; see NOTICES-PORTED-CODE.md.
+
 //! Unity value types exactly as the original game stores them.
 //!
 //! Each struct mirrors the one of the same name in the installed game's `UnityEngine.CoreModule.dll` (Unity
