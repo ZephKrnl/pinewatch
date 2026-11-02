@@ -13,6 +13,7 @@ use pinewatch_io::{LogLevel, LogSink, log_exception, log_exception_only};
 use pinewatch_mono::{ExceptionKind, Guid, MonoException, NetString, chars, sr};
 use sha1::{Digest, Sha1};
 
+use crate::local::Local;
 use crate::master_bundle::{MasterBundleConfig, asset_bundle_version};
 use crate::origin::{OriginId, Origins};
 use crate::paths::{MonoPath, STYLE};
@@ -57,6 +58,14 @@ impl AssetHeader {
     /// The dictionary `LoadFile` calls `data`.
     pub fn data(&self) -> DictRef<'_> {
         data_dictionary(&self.definition.asset_data)
+    }
+
+    /// `new Local(file.translationData, file.fallbackTranslationData)`.
+    pub fn localization(&self) -> Local<'_> {
+        Local::new(
+            self.definition.translation_data.as_ref().map(DatTree::root),
+            self.definition.fallback_translation_data.as_ref().map(DatTree::root),
+        )
     }
 }
 

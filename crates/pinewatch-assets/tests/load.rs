@@ -242,3 +242,16 @@ fn definitions_wait_for_the_core_master_bundle() {
     assert!(loader.headers.is_empty());
     assert_eq!(loader.pending(), 1);
 }
+
+/// The header's `Local` reads the definition's translation, with the English fallback when the language isn't
+/// English.
+#[test]
+fn header_localization_reads_the_translation() {
+    let (_dir, _install, loader, _log) = load(&[
+        ("Bundles/Items/Gun/Gun.dat", &format!("GUID {GUID}\nType Gun")),
+        ("Bundles/Items/Gun/English.dat", "Name Eaglefire\nDescription Rifle"),
+    ]);
+    let local = loader.headers[0].localization();
+    assert_eq!(local.format("Name").to_string_lossy(), "Eaglefire");
+    assert_eq!(local.format("Missing").to_string_lossy(), "Missing");
+}

@@ -2,6 +2,7 @@
 //! definitions and translations, master bundles, and the asset index. See `docs/superpowers/plans/` (M2c).
 
 mod load;
+mod local;
 mod master_bundle;
 mod origin;
 mod paths;
@@ -11,6 +12,7 @@ mod types;
 mod worker;
 
 pub use load::{AssetHeader, AssetLoader};
+pub use local::Local;
 pub use master_bundle::{MasterBundleConfig, asset_bundle_version};
 pub use origin::{AssetOrigin, OriginId, Origins};
 pub use paths::MonoPath;
