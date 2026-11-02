@@ -10,7 +10,7 @@ file alone.
   the Windows run (see "Exact next steps").
 - **Done:** M1 (the bootable terrain viewer) and M2a (the `.dat` reader) are merged into `main`. On the Windows PC,
   with the game installed, `cargo test --workspace` passes all 396 tests on `main` and skips none.
-- **Linux (cloud):** on `main-9m65p0`, `cargo test --workspace` passes 532 tests (the install tests print
+- **Linux (cloud):** on `main-9m65p0`, `cargo test --workspace` passes 534 tests (the install tests print
   `skipped: no Unturned install found`; the Windows-only test doesn't build), `cargo clippy --workspace --all-targets`
   gives no warnings, and `cargo xtask check-deps` passes for the 7 format crates. Setup a fresh Linux machine needs:
   `apt-get install libasound2-dev libudev-dev libwayland-dev libxkbcommon-dev` (pkg-config was present),
@@ -130,7 +130,7 @@ V23's messages and the level's `Allow_Holiday_Redirects` (V14). It adds the step
 | Task | State | What exists |
 |---|---|---|
 | 1 `Block` | Done | `pinewatch-binary::Block` (every reader but `readSingleQuaternion` and `read(Type…)`); `pinewatch_mono::utf8_get_string` (`Encoding.UTF8.GetString`, flushed) |
-| 2 `Level.dat`, packed version | Not started | |
+| 2 `Level.dat`, packed version | Done | `read_level_file` (`LevelFile`, `ELevelSize`, `ELevelType`), `try_parse_packed_version` (`Parser.TryGetUInt32FromIP`, out value included) |
 | 3 to 6 `pinewatch-json` | Not started | Reader, typed reads, `object` values, typed deserialization |
 | 7 `LevelInfoConfigData`, `ReadLevelInfo` | Not started | |
 
@@ -182,7 +182,7 @@ sessions anyway. No dev container exists. `CLAUDE.md` carries his rules into tho
 
 ## Exact next steps
 
-1. **On the Windows PC:** `git fetch`, check out `main-9m65p0`. Run `cargo test --workspace` (expect 533 tests,
+1. **On the Windows PC:** `git fetch`, check out `main-9m65p0`. Run `cargo test --workspace` (expect 535 tests,
    none skipped: the Windows-only test, plus the install tests that skip on Linux run for the first time, among them
    the map walk, `shipped_messages`' assembly half, `shipped_mscorlib` with the five new strings, and the assets
    install test). If the level install test reports `Context "Landscape tile …" missing asset` warnings, look for the

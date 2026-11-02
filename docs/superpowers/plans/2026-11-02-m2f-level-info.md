@@ -124,6 +124,9 @@ Done 2026-11-02: as planned, plus a test for a string that ends at the last byte
 - [ ] **Step 4: Run** the test; expect it to pass.
 - [ ] **Step 5: Commit** `M2f task 2: Level.dat and the packed version`.
 
+Done 2026-11-02: as planned, plus `"1.2.0.300"` → `(true, 0x0102_002C)`, since `"1.2.3.300"` gives the same value
+with or without the `& 0xFF` mask.
+
 ### Task 3: `pinewatch-json`: `JsonTextReader` tokens
 
 **Files:**

@@ -7,6 +7,7 @@ rust-version.workspace = true
 publish.workspace = true
 
 [dependencies]
+pinewatch-binary.workspace = true
 pinewatch-dat.workspace = true
 pinewatch-io.workspace = true
 pinewatch-mono.workspace = true
