@@ -97,12 +97,6 @@ isn't set up. Each entry says what the Rust code does, where the behavior came f
   value is rounded once to 53 bits, and `float` is the cast of that `double`. NaN has the C# constants' bits.
   **Check:** a harness sweep of generated decimals near rounding boundaries, long digit strings and denormals.
 
-- **V18. Enum member order.** `Enum.TryParse` matches names in the order `GetCachedValuesAndNames` returns: Mono's
-  declaration order, sorted by value with `Array.Sort` when the values don't ascend. `Array.Sort` is an introsort,
-  stable up to 16 members but not above. Pinewatch sorts stably. The order only matters for names that differ only
-  by letter case, parsed with `ignoreCase`. **Check:** when each game enum is ported, confirm no two of its names are
-  equal ignoring case; if one is, dump its member order with the harness.
-
 ## `pinewatch-kvt`
 
 - **V9. Hierarchy hash (later step).** `LevelHierarchy.load` hashes the bytes its `StreamReader` pulled through
@@ -166,3 +160,11 @@ Settled 2026-11-01 from the compiled source and the shipped `mscorlib.dll` (V0):
   `ArgumentOutOfRangeException("index", "Index was out of range. Must be non-negative and less than the size of the
   collection.")`. Its NewLine is V2's.
 - **V8. Null dictionary key.** `Dictionary.FindEntry(null)` throws `ArgumentNullException("key")`. Its NewLine is V2's.
+
+Settled 2026-11-02 from the source, without the harness:
+
+- **V18. Enum member order.** `Enum.TryParse` matches names in the order `GetCachedValuesAndNames` returns: Mono's
+  declaration order, sorted by value with `Array.Sort` when the values don't ascend. `Array.Sort` is unstable at
+  every size (the three-element case reorders `[1, 1, 0]`), but it only reorders members with equal values, and
+  those give the same bits whichever matches first. Pinewatch's stable sort therefore gives the same results. The
+  test `equal_values_give_the_same_bits_in_any_order` covers it.

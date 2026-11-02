@@ -39,7 +39,9 @@ pub trait NetEnum: Copy {
 
 /// The members in the order `GetCachedValuesAndNames` returns them: Mono's `GetEnumValuesAndNames` gives
 /// declaration order and reports whether the values ascend (unsigned); if not, `Array.Sort(values, names)` orders
-/// them by value. This uses a stable sort, which matches `Array.Sort` up to 16 members (`VERIFICATION.md`, V18).
+/// them by value. `Array.Sort` is unstable (even `[1, 1, 0]` reorders its two 1s), but sorting by value fixes the
+/// order of members with different values, and members with equal values give the same bits whichever matches
+/// first, so any sort gives the same results (`VERIFICATION.md`, V18, settled).
 fn ordered_members(info: &EnumInfo) -> Vec<(Vec<u16>, u64)> {
     let mut members: Vec<(Vec<u16>, u64)> =
         info.names.iter().zip(info.values).map(|(name, &value)| (name.encode_utf16().collect(), value)).collect();
