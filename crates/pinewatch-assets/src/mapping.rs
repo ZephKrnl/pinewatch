@@ -56,10 +56,16 @@ impl AssetMapping {
             .iter_mut()
             .find(|(candidate, _)| AssetCategory::from(*candidate) == category)
             .map(|(_, table)| table)
-            .ok_or_else(|| {
-                let message = sr::ARG_KEY_NOT_FOUND_WITH_KEY.replace("{0}", &category.to_string());
-                MonoException::new(ExceptionKind::KeyNotFound, message)
-            })
+            .ok_or_else(|| key_not_found(category))
+    }
+
+    /// `legacyAssetsTable[category]` for reading, with the same exception.
+    pub(crate) fn table(&self, category: AssetCategory) -> Result<&MonoDictionary<u16, usize>, MonoException> {
+        self.legacy_assets_table
+            .iter()
+            .find(|(candidate, _)| AssetCategory::from(*candidate) == category)
+            .map(|(_, table)| table)
+            .ok_or_else(|| key_not_found(category))
     }
 
     /// `assetDictionary.TryGetValue(guid)`.
@@ -91,4 +97,10 @@ impl AssetMapping {
     pub fn modification_counter(&self) -> i32 {
         self.modification_counter
     }
+}
+
+/// What `Dictionary`'s indexer throws for a missing key.
+fn key_not_found(category: AssetCategory) -> MonoException {
+    let message = sr::ARG_KEY_NOT_FOUND_WITH_KEY.replace("{0}", &category.to_string());
+    MonoException::new(ExceptionKind::KeyNotFound, message)
 }

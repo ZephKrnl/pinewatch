@@ -173,6 +173,10 @@ isn't set up. Each entry says what the Rust code does, where the behavior came f
   `VendorAsset` names with `<` tags skip `ItemTool.filterRarityRichText` and `RichTextUtil.replaceColorTags` (a
   regular expression), and `ServerListCurationAsset` uses its name, as when it has no curation file. **Fix:** port
   each class's `PopulateAsset` with the step that first needs it.
+- **V29. Current-culture integer parsing (gap).** `CachingBcAssetRef.TryParse(string, …)` reads a legacy ID with
+  `ushort.TryParse(text, out id)`: `NumberStyles.Integer` in the player's culture. Pinewatch parses in the invariant
+  culture, which differs only for cultures whose positive or negative sign isn't `+` or `-`. **Fix:** culture
+  support (`Culture` parameter, P5), with V13.
 
 ## `pinewatch-kvt`
 

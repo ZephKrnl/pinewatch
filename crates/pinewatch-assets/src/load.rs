@@ -139,15 +139,44 @@ impl AssetLoader {
     /// `Assets.find(Guid)`: the asset with this GUID in the current mapping, with each redirector replaced by the
     /// asset its target GUID finds. The 33rd redirect gives up with a warning.
     pub fn find(&self, guid: Guid, log: &mut dyn LogSink) -> Option<usize> {
+        let found = self.default_mapping.asset_dictionary.try_get_value(&guid).copied();
+        let message = || format!("Infinite asset director loop encountered when resolving: {guid}");
+        self.follow_redirectors(found, log, message)
+    }
+
+    /// `Assets.find(EAssetType, ushort)`: nothing for `NONE` or ID 0; otherwise the legacy table's asset, with
+    /// redirectors followed as `find` does. The table lookup throws for a category the mapping doesn't hold.
+    pub fn find_legacy(
+        &self,
+        category: AssetCategory,
+        id: u16,
+        log: &mut dyn LogSink,
+    ) -> Result<Option<usize>, MonoException> {
+        if category == AssetCategory::from(EAssetType::None) || id == 0 {
+            return Ok(None);
+        }
+        let found = self.default_mapping.table(category)?.try_get_value(&id).copied();
+        let message =
+            || format!("Infinite asset director loop encountered when resolving Type: {category} Legacy ID: {id}");
+        Ok(self.follow_redirectors(found, log, message))
+    }
+
+    /// Both `find`s' loop: while the result is a redirector, the asset its target GUID finds replaces it. The 33rd
+    /// redirect gives up with the warning `message` makes.
+    fn follow_redirectors(
+        &self,
+        mut result: Option<usize>,
+        log: &mut dyn LogSink,
+        message: impl FnOnce() -> String,
+    ) -> Option<usize> {
         let dictionary = &self.default_mapping.asset_dictionary;
-        let mut result = dictionary.try_get_value(&guid).copied();
         let mut redirects = 0;
         // `target_guid` is set exactly for redirectors.
         while let Some(target) = result.and_then(|index| self.headers[index].target_guid) {
             result = dictionary.try_get_value(&target).copied();
             redirects += 1;
             if redirects > 32 {
-                log.log(LogLevel::Warn, &format!("Infinite asset director loop encountered when resolving: {guid}"));
+                log.log(LogLevel::Warn, &message());
                 return None;
             }
         }

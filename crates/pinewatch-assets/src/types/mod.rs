@@ -48,8 +48,9 @@ impl EAssetType {
     }
 }
 
-/// An `EAssetType` value as C# holds it, which may be one no member has (`AssetCategory 42` parses).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+/// An `EAssetType` value as C# holds it, which may be one no member has (`AssetCategory 42` parses). The default
+/// is `NONE`, as `default(EAssetType)` is.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
 pub struct AssetCategory(pub i32);
 
 impl AssetCategory {
