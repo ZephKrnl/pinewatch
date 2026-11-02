@@ -5,7 +5,7 @@ tree: the work below was requested and then paused before it started.
 
 ## Where things stand
 
-- **Current branch:** `main`, at the commit that adds this file. The working tree is clean.
+- **Current branch:** `main`. The working tree is clean.
 - **Done:** M1 (the bootable terrain viewer) and M2a (the `.dat` reader) are merged into `main`. On the Windows PC,
   with the game installed, `cargo test --workspace` passes all 396 tests and skips none.
 - **Remote:** `origin` is the private GitHub repository `ZephKrnl/pinewatch`. It stays private.
@@ -43,6 +43,7 @@ tree: the work below was requested and then paused before it started.
   config). No `Co-Authored-By` lines and no AI attribution. The existing history stays exactly as it is.
 - **The repository stays private.** Never push credentials, game files or other third-party assets.
 - **Development resumes only on the owner's explicit command.**
+- `CLAUDE.md` holds these rules for every Claude session, and `.claude/settings.json` turns off the co-author line.
 
 ## Unfinished work
 
@@ -85,12 +86,13 @@ remaining differences.
     characters, including ignorable ones such as U+00AD.
 - **This work needs the Windows PC**, where the game install and Unity are.
 
-### 3. Codespaces and phone access (skipped on purpose)
+### 3. Phone and cloud access
 
-The owner asked for a GitHub Codespaces setup so work could continue from a phone, then chose to push to GitHub
-only. The reason is section 2 of the U3 SDK License (`LICENSE.txt`), which bars using or developing the SDK or any
-Mod "for or in connection with ... mobile or handheld devices", and any environment that enables gameplay on them
-through cloud-based delivery. Revisit only if the owner decides that use is permitted.
+The owner first asked for a GitHub Codespaces setup, then chose to push to GitHub only, because section 2 of the
+U3 SDK License (`LICENSE.txt`) bars using or developing the SDK or any Mod "for or in connection with ... mobile or
+handheld devices", and any environment that enables gameplay on them through cloud-based delivery. No dev container
+exists. Later the same day the owner chose to continue from his phone through a Claude Code cloud session that works
+on this repository while the PC is off. `CLAUDE.md` carries his rules into those sessions.
 
 ### 4. Loose ends
 
