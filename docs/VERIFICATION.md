@@ -166,9 +166,10 @@ isn't set up. Each entry says what the Rust code does, where the behavior came f
   bundle wait with a test install.
 - **V28. Asset classes' own `PopulateAsset` (gap).** The index is ported exactly (`AddToMapping`'s rules, messages
   and `Dictionary` order), and so is what it reads from each asset: the friendly name of the 10 classes that
-  override `FriendlyName`, `ItemAsset.isPro`, and all of `RedirectorAsset`'s `PopulateAsset`. The other classes'
-  `PopulateAsset` isn't ported yet, so their own `ReportError` messages are missing, and an asset whose
-  `PopulateAsset` throws in the game (`Caught exception while populating ...`, not indexed) is indexed here.
+  override `FriendlyName`, `ItemAsset.isPro`, and all of `RedirectorAsset`'s and `LandscapeMaterialAsset`'s
+  `PopulateAsset`. A ported `PopulateAsset` that throws takes `LoadFile`'s path (`Caught exception while populating
+  ...`, not indexed). The other classes' `PopulateAsset` isn't ported yet, so their own `ReportError` messages are
+  missing, and an asset whose `PopulateAsset` throws in the game is indexed here.
   `VendorAsset` names with `<` tags skip `ItemTool.filterRarityRichText` and `RichTextUtil.replaceColorTags` (a
   regular expression), and `ServerListCurationAsset` uses its name, as when it has no curation file. **Fix:** port
   each class's `PopulateAsset` with the step that first needs it.
@@ -202,9 +203,13 @@ isn't set up. Each entry says what the Rust code does, where the behavior came f
 - **V13. Culture-formatted numbers in messages (gap).** `LandscapeCoord.ToString()` and `UnturnedLog`'s
   `string.Format` use the player's culture. M1 formats with the invariant culture, which only differs for negative
   numbers in cultures with a different minus sign. **Fix:** culture support (`Culture` parameter, P5).
-- **V14. Holiday material redirects (later step).** When `Level.shouldUseHolidayRedirects` is on, `LandscapeTile.read`
-  swaps material references for their holiday versions. M1 doesn't use materials yet. **Fix:** port this with the
-  M2 asset system.
+- **V14. Holiday material redirects (in progress).** M2c task 11 ports `LandscapeMaterialAsset` and its
+  `getHolidayRedirect`: Christmas, Halloween and April Fools pick their redirect, and every other holiday value gives
+  none, including values no member has (the server sends the holiday, so any value can arrive). Still open: the swap
+  in `LandscapeTile.read` when `Level.shouldUseHolidayRedirects` is on, with the asset lookups around it, and the two
+  inputs: `Level.shouldUseHolidayRedirects` (it needs the level's `Allow_Holiday_Redirects`) and the active holiday
+  (`Provider.authorityHoliday`: from the server, or the holiday schedule when the mode config allows holidays).
+  **Fix:** the tile step next in task 11; the inputs with the level config and the provider.
 - **V15. More than 8 materials.** `materials[layer] = …` on the 8-slot `InspectableList` is assumed to throw
   `List<T>`'s `ArgumentOutOfRangeException` (`Index was out of range. …` + NewLine + `Parameter name: index`).
   **Check:** `InspectableList`'s indexer.

@@ -13,6 +13,7 @@ use pinewatch_io::{LogLevel, LogSink, log_exception, log_exception_only};
 use pinewatch_mono::{ExceptionKind, Guid, MonoException, NetString, chars, sr};
 use sha1::{Digest, Sha1};
 
+use crate::landscape_material::LandscapeMaterialAsset;
 use crate::local::Local;
 use crate::master_bundle::{MasterBundleConfig, asset_bundle_version};
 use crate::mapping::AssetMapping;
@@ -64,6 +65,8 @@ pub struct AssetHeader {
     pub has_been_replaced: bool,
     /// `RedirectorAsset.TargetGuid`, for redirectors.
     pub target_guid: Option<Guid>,
+    /// The fields `LandscapeMaterialAsset.PopulateAsset` reads, for landscape materials.
+    pub landscape_material: Option<LandscapeMaterialAsset>,
 }
 
 impl AssetHeader {
@@ -96,7 +99,8 @@ pub struct AssetLoader {
     pending: VecDeque<AssetDefinition>,
     /// `Assets.errors`: every `reportError` text.
     pub errors: Vec<String>,
-    /// The assets `LoadFile` created, in loading order.
+    /// The assets `LoadFile` created, in loading order. One whose `PopulateAsset` threw is here too, but in no
+    /// origin's list and not in the index.
     pub headers: Vec<AssetHeader>,
     /// `defaultAssetMapping`.
     default_mapping: AssetMapping,
@@ -538,18 +542,24 @@ impl AssetLoader {
             is_pro: false,
             has_been_replaced: false,
             target_guid: None,
+            landscape_material: None,
         };
 
         // `asset.PopulateAsset(…)`, then `asset.origin.assets.Add(asset)` and `AddToMapping`, all in one `try`.
-        let reports = populate(&mut header);
+        // `Assets.currentMasterBundle` is the master bundle chosen above.
+        let current_master_bundle = master_bundle.map(|index| self.master_bundles[index].asset_bundle_name.clone());
+        let (reports, populated) = populate(&mut header, current_master_bundle);
         let index = self.headers.len();
         self.headers.push(header);
         for report in reports {
             self.report_asset_error(index, &report, log);
         }
-        self.origin_assets.push((origin, index));
-        let override_existing_ids = self.origins.get(origin).should_assets_override_existing_ids;
-        if let Err(exception) = self.add_to_mapping(index, override_existing_ids, log) {
+        let outcome = populated.and_then(|()| {
+            self.origin_assets.push((origin, index));
+            let override_existing_ids = self.origins.get(origin).should_assets_override_existing_ids;
+            self.add_to_mapping(index, override_existing_ids, log)
+        });
+        if let Err(exception) = outcome {
             self.report_error(
                 format!("Caught exception while populating \"{asset_path}\": {}", exception_message(&exception)),
                 log,

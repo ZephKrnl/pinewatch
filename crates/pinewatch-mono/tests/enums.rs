@@ -19,6 +19,46 @@ fn parse(s: &str, ignore_case: bool) -> Option<Test> {
     try_parse_enum(&Test::INFO, Some(&NetString::from_str(s)), ignore_case).map(Test::from_bits)
 }
 
+pinewatch_mono::net_enum! {
+    /// A C# enum `: sbyte { LOW = -2, ZERO = 0, HIGH = 100 }`.
+    struct Signed(i8) {
+        LOW = -2,
+        /// A documented member.
+        ZERO = 0,
+        HIGH = 100,
+    }
+}
+
+pinewatch_mono::net_enum! {
+    /// A C# `[Flags]` enum `: uint { NONE = 0, TOP = 1u << 31 }`.
+    pub struct Unsigned(u32) {
+        NONE = 0,
+        TOP = 1 << 31
+    }
+}
+
+/// `net_enum!` declares the constants and the members in declaration order, with values as Mono reads them into a
+/// `ulong`: signed ones sign-extended, unsigned ones zero-extended.
+#[test]
+fn declared_enums() {
+    assert_eq!((Signed::LOW, Signed::ZERO, Signed::HIGH), (Signed(-2), Signed(0), Signed(100)));
+    assert_eq!(Signed::default(), Signed::ZERO);
+    assert_eq!(Signed::INFO.underlying, EnumUnderlying::I8);
+    assert_eq!(Signed::INFO.names, ["LOW", "ZERO", "HIGH"]);
+    assert_eq!(Signed::INFO.values, [u64::MAX - 1, 0, 100]);
+    assert_eq!(Signed::from_bits(u64::MAX - 1), Signed::LOW);
+    assert_eq!(Signed::from_bits(0x1FF), Signed(-1));
+    let signed = |s: &str| try_parse_enum(&Signed::INFO, Some(&NetString::from_str(s)), true).map(Signed::from_bits);
+    assert_eq!(signed("low"), Some(Signed::LOW));
+    assert_eq!(signed("-128"), Some(Signed(-128)));
+
+    assert_eq!(Unsigned::TOP, Unsigned(0x8000_0000));
+    assert_eq!(Unsigned::INFO.underlying, EnumUnderlying::U32);
+    assert_eq!(Unsigned::INFO.names, ["NONE", "TOP"]);
+    assert_eq!(Unsigned::INFO.values, [0, 0x8000_0000]);
+    assert_eq!(Unsigned::from_bits(0x1_8000_0000), Unsigned::TOP);
+}
+
 #[test]
 fn enum_parsing() {
     assert_eq!(parse("B", true), Some(Test(1)));

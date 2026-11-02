@@ -4,7 +4,7 @@
 //! `Enum.TryParse(string value, bool ignoreCase, out TEnum result)`.
 //!
 //! A C# enum variable can hold any value of its underlying type, so a ported enum is a `#[repr(transparent)]`
-//! struct around that type with associated constants, and implements [`NetEnum`].
+//! struct around that type with associated constants, and implements [`NetEnum`]. [`net_enum!`] declares one.
 
 use crate::{NetString, NumberFormat, NumberStyles, chars};
 
@@ -35,6 +35,59 @@ pub trait NetEnum: Copy {
     const INFO: EnumInfo;
     /// The enum value with these underlying bits (truncated to the underlying type, as `Enum.ToObject` does).
     fn from_bits(bits: u64) -> Self;
+}
+
+/// Declares a ported C# enum: a `#[repr(transparent)]` struct around the underlying type, a constant for each
+/// member, and its [`NetEnum`] with the members in declaration order. Every member's value is written out.
+///
+/// ```
+/// pinewatch_mono::net_enum! {
+///     /// `enum EExample : byte { NONE = 0, SOME = 4 }`.
+///     pub struct EExample(u8) {
+///         NONE = 0,
+///         SOME = 4,
+///     }
+/// }
+/// assert_eq!(EExample::SOME, EExample(4));
+/// ```
+#[macro_export]
+macro_rules! net_enum {
+    (
+        $(#[$meta:meta])*
+        $vis:vis struct $name:ident($underlying:ident) {
+            $($(#[$member_meta:meta])* $member:ident = $value:expr),* $(,)?
+        }
+    ) => {
+        $(#[$meta])*
+        #[repr(transparent)]
+        #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
+        $vis struct $name(pub $underlying);
+
+        impl $name {
+            $($(#[$member_meta])* pub const $member: Self = Self($value);)*
+        }
+
+        impl $crate::NetEnum for $name {
+            const INFO: $crate::EnumInfo = $crate::EnumInfo {
+                underlying: $crate::net_enum!(@underlying $underlying),
+                names: &[$(stringify!($member)),*],
+                // `as u64` sign-extends a signed value and zero-extends an unsigned one.
+                values: &[$(Self::$member.0 as u64),*],
+            };
+
+            fn from_bits(bits: u64) -> Self {
+                Self(bits as $underlying)
+            }
+        }
+    };
+    (@underlying i8) => { $crate::EnumUnderlying::I8 };
+    (@underlying u8) => { $crate::EnumUnderlying::U8 };
+    (@underlying i16) => { $crate::EnumUnderlying::I16 };
+    (@underlying u16) => { $crate::EnumUnderlying::U16 };
+    (@underlying i32) => { $crate::EnumUnderlying::I32 };
+    (@underlying u32) => { $crate::EnumUnderlying::U32 };
+    (@underlying i64) => { $crate::EnumUnderlying::I64 };
+    (@underlying u64) => { $crate::EnumUnderlying::U64 };
 }
 
 /// The members in the order `GetCachedValuesAndNames` returns them: Mono's `GetEnumValuesAndNames` gives

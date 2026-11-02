@@ -1,7 +1,7 @@
 # Handoff
 
-The state of Pinewatch on 2026-11-02, updated at the end of the second cloud session, written so work can resume
-from this file alone.
+The state of Pinewatch on 2026-11-02, updated during the third cloud session, written so work can resume from this
+file alone.
 
 ## Where things stand
 
@@ -10,7 +10,7 @@ from this file alone.
   the Windows run (see "Exact next steps").
 - **Done:** M1 (the bootable terrain viewer) and M2a (the `.dat` reader) are merged into `main`. On the Windows PC,
   with the game installed, `cargo test --workspace` passes all 396 tests on `main` and skips none.
-- **Linux (cloud):** on `main-9m65p0`, `cargo test --workspace` passes 463 tests (the install tests print
+- **Linux (cloud):** on `main-9m65p0`, `cargo test --workspace` passes 494 tests (the install tests print
   `skipped: no Unturned install found`; the Windows-only test doesn't build), `cargo clippy --workspace --all-targets`
   gives no warnings, and `cargo xtask check-deps` passes for the 7 format crates. Setup a fresh Linux machine needs:
   `apt-get install libasound2-dev libudev-dev libwayland-dev libxkbcommon-dev` (pkg-config was present),
@@ -95,19 +95,25 @@ on the branch. M2c comes before M2b because M2b needs the PC.
 | 5 Master bundles | Done | `MasterBundleConfig` with its exceptions and version rules; bundle file hashed as a stream |
 | 6 Asset headers | Done | `AssetLoader`: master bundles, core bundle wait, `TryLoadFile`, `LoadFile` up to creating the asset (`AssetHeader`) |
 | 7 Asset types | Done | 95 asset classes, the 70 legacy keys, `GetTypeFriendlyName`, `AssetTypeResolver` for `Metadata.Type` |
-| 8 Localization | Not started | `Files/Local.cs` |
-| 9 Asset index | Not started | `AddToMapping` and its messages; needs each type's `FriendlyName` (10 classes override it) and `RedirectorAsset`'s data category |
-| 10 Asset references | Not started | `Files/UnturnedDatEx.cs` and the reference types |
-| 11 `LandscapeMaterialAsset`, holiday redirects | Not started | V14 |
-| 12 The whole install | First part | `pinewatch-assets/tests/install.rs` loads every location up to headers; extend it as tasks 8 to 11 land |
+| 8 Localization | Done | `Local`: `format`, `format_or_null`, `format_or_empty`, the English fallback, `has` |
+| 9 Asset index | Done | `AssetMapping` (legacy tables, GUID dictionary, asset list, modification counter), `AddToMapping` with its messages, the 10 `FriendlyName` overrides, `ItemAsset.isPro`, `RedirectorAsset` |
+| 10 Asset references | First part | `AssetReference`, `ContentReference`, `parse_guid_or_legacy_id`, `read_asset_reference`; still to do: `MasterBundleReference`, `AudioReference`, the caching references, the rest of `UnturnedDatEx` |
+| 11 `LandscapeMaterialAsset`, holiday redirects | First part | `LandscapeMaterialAsset` (`AssetHeader::landscape_material`), `EPhysicsMaterial`, `ERayMask`, `ENPCHoliday`, `holiday_redirect`; still to do: `Assets.find`, `ClientAssetIntegrity`, the tile side (V14) |
+| 12 The whole install | First part | `pinewatch-assets/tests/install.rs` loads and indexes every location; asserts the core bundle, 5,000+ assets and item ID 1 |
+
+Shared pieces added on the way: `MonoDictionary` (`Dictionary<K, V>`'s slot order, which the asset list depends
+on), `Guid`'s `D` format, and the `net_enum!` macro, which declares a ported C# enum from one member list. A
+class's `PopulateAsset` that throws now takes `LoadFile`'s "Caught exception while populating" path.
 
 New register and verification entries: L3 (d) no `Sandbox` folder is created, L3 (e) a missing GUID is never
 written, L5 made concrete for the asset worker, L11 no workshop yet; V21 the `WITH_NOREDIST` build assumption, V22
 Mono's `Path` rare forms, V23 level discovery's `Config.json` messages, V24 folder enumeration, V25 master bundle
-loading, V26 culture-sensitive comparisons, V27 loading order and constructor failures.
+loading, V26 culture-sensitive comparisons, V27 loading order and constructor failures, V28 the classes'
+own `PopulateAsset`; V14 is narrowed to the tile side and the holiday inputs.
 
 New resource strings, checked by `shipped_mscorlib` on the PC: `IO_PATH_NOT_FOUND_PATH`,
-`ARGUMENT_OUT_OF_RANGE_START_INDEX_LARGER_THAN_LENGTH`, `MISSING_METHOD_NAME`.
+`ARGUMENT_OUT_OF_RANGE_START_INDEX_LARGER_THAN_LENGTH`, `MISSING_METHOD_NAME`, `ARGUMENT_ADDING_DUPLICATE_WITH_KEY`,
+`ARG_KEY_NOT_FOUND_WITH_KEY`.
 
 ### Linux test fixes
 
@@ -136,7 +142,7 @@ only where file systems ignore case. Neither changes production behavior.
 
 ### 2. In the cloud (no PC needed)
 
-- **M2c tasks 8 to 11** in the plan's order, then the rest of task 12.
+- **The rest of M2c tasks 11 and 10**, then the rest of task 12 (the plan lists what each still needs).
 - Later plans: M2d (asset processor) and M2e (terrain materials) need Unity on the PC.
 
 ### 3. Phone and cloud access
@@ -152,14 +158,14 @@ sessions anyway. No dev container exists. `CLAUDE.md` carries his rules into tho
 
 ## Exact next steps
 
-1. **On the Windows PC:** `git fetch`, check out `main-9m65p0`. Run `cargo test --workspace` (expect 464 tests,
+1. **On the Windows PC:** `git fetch`, check out `main-9m65p0`. Run `cargo test --workspace` (expect 495 tests,
    none skipped: the Windows-only test, plus the install tests that skip on Linux run for the first time, among them
-   the map walk, `shipped_messages`' assembly half, `shipped_mscorlib` with the three new strings, and the assets
+   the map walk, `shipped_messages`' assembly half, `shipped_mscorlib` with the five new strings, and the assets
    install test). If a shipped-text test fails, compare with the DLL before changing anything: the port must match
    it. Run `cargo clippy --workspace --all-targets` and `cargo xtask check-deps`. Do the V17, V3 and V21 checks above
    and update `docs/VERIFICATION.md`. Then fast-forward `main` and push it.
-2. **In the cloud or on the PC:** M2c task 8 (localization), then 9, 10, 11 and the rest of 12, test first, one
-   commit per task, as tasks 1 to 7 were done.
+2. **In the cloud or on the PC:** the rest of M2c task 11 (`Assets.find`, `ClientAssetIntegrity`, the tile side),
+   then the rest of 10 and 12, test first, one commit per step, as tasks 1 to 9 were done.
 3. **On the PC:** M2b: write its spec and plan, choosing between the Unity Editor in batch mode and the game's own
    Mono runtime for each check, then implement it test first and record what the comparisons show.
 
@@ -174,7 +180,9 @@ sessions anyway. No dev container exists. `CLAUDE.md` carries his rules into tho
   every path is a Mono string paired with an install-relative path (`MonoPath`); master bundles count as loaded
   (V25).
 - Not ported yet: the writers and editable nodes, the twelve `DateTime` test rows, the hash in `Data.cs`,
-  `readByteArray`, and `UnturnedDatEx` (M2c task 10).
+  `readByteArray`, and most of `UnturnedDatEx` (M2c task 10).
+- A ported C# enum is a transparent integer newtype with a constant per member, so values no member has survive;
+  `pinewatch_mono::net_enum!` declares one (older enums were written out by hand and work the same way).
 - Open gaps: V19 (types beyond the asset classes), V20, V22, V23, V25 and V26 in `docs/VERIFICATION.md`, and L7 in
   `COMPATIBILITY.md`.
 
