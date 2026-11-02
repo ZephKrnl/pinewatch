@@ -5,7 +5,7 @@ use std::io;
 
 use pinewatch_io::InstallRoot;
 use pinewatch_io::mono_path::{self, PathStyle};
-use pinewatch_mono::{ExceptionKind, MonoException, sr};
+use pinewatch_mono::{ExceptionKind, MonoException, chars, sr};
 
 /// The platform whose `System.IO.Path` rules apply: the one Pinewatch runs on, as for the game.
 pub(crate) const STYLE: PathStyle = PathStyle::HOST;
@@ -59,6 +59,26 @@ fn entry_names(install: &InstallRoot, dir: &MonoPath) -> Result<Vec<String>, Mon
 pub(crate) fn directories(install: &InstallRoot, dir: &MonoPath) -> Result<Vec<MonoPath>, MonoException> {
     let names = entry_names(install, dir)?;
     Ok(names.iter().map(|name| dir.enumerated(name)).filter(|entry| install.is_dir(&entry.rel)).collect())
+}
+
+/// `Directory.EnumerateFiles(dir, "*.asset")`, in enumeration order. The pattern is the Win32 expression `*.asset`,
+/// which corefx matches with `name.EndsWith(".asset", …)`: ignoring case where the platform's file names do
+/// (Windows), exactly elsewhere.
+pub(crate) fn asset_files(install: &InstallRoot, dir: &MonoPath) -> Result<Vec<MonoPath>, MonoException> {
+    let suffix: Vec<u16> = ".asset".encode_utf16().collect();
+    let names = entry_names(install, dir)?;
+    Ok(names
+        .iter()
+        .filter(|name| {
+            let name: Vec<u16> = name.encode_utf16().collect();
+            name.len() >= suffix.len() && {
+                let end = &name[name.len() - suffix.len()..];
+                if cfg!(windows) { chars::equals_ordinal_ignore_case(end, &suffix) } else { end == suffix }
+            }
+        })
+        .map(|name| dir.enumerated(name))
+        .filter(|entry| install.exists(&entry.rel))
+        .collect())
 }
 
 /// What `FileSystemEnumerator` throws when it can't open `dir`: `DirectoryNotFoundException` with the full path of

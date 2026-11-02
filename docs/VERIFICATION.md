@@ -135,6 +135,16 @@ isn't set up. Each entry says what the Rust code does, where the behavior came f
   `ReadLevelInfo` accepts a folder whose `Level.dat` exists and reads, and Pinewatch logs `Discovered level ...` for
   it. Not yet produced: `Unable to parse <map>/Config.json! ...` and the level version error, which need the JSON
   reader, and `Level.dat`'s fields. **Fix:** level info with `pinewatch-json`.
+- **V24. Folder enumeration.** Unity's Mono enumerates with corefx's `FileSystemEnumerator`: on Windows through
+  `NtQueryDirectoryFile`, so entries come in the file system's own order, the order Rust's `read_dir`
+  (`FindFirstFileExW`) also returns on NTFS. `EnumerateFiles(dir, "*.asset")` uses the compatible options (Win32
+  matching, platform case, nothing skipped): `*.asset` becomes `name.EndsWith(".asset", OrdinalIgnoreCase)` on
+  Windows and an ordinal match on Linux, and short 8.3 names aren't matched. A missing folder throws
+  `DirectoryNotFoundException` (`Could not find a part of the path '<full path>'.`). The searcher calls
+  `Path.Combine` and `Path.GetFileName` outside its `try` blocks; an exception there would end its thread and leave
+  the location reading forever, where Pinewatch returns an error. File-system names can't hold the characters that
+  throw. **Check:** enumeration order and `*.asset` matching on the reference machine, including a folder with
+  mixed-case extensions.
 
 ## `pinewatch-kvt`
 

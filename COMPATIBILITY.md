@@ -100,6 +100,10 @@ and the license notices are in `NOTICES-PORTED-CODE.md`.
 - **Original:** where messages come from different threads (asset loading workers, foliage worker), their relative order
   depends on timing. The original itself has no fixed order.
 - **Rust:** matches the order within each thread and every ordering the original does guarantee.
+  - Asset loading (M2c): the original searches and reads every search location at once, each with a searcher and a
+    reader thread. Rust takes the locations in the order they were requested and finishes each before the next.
+    Inside a location it keeps the searcher's order, places each searcher exception where the searcher raised it,
+    and each read result where the reader takes the work item, which is one order the original can produce.
 - **Detection:** comparisons are made per thread.
 
 ### L6. Engine-native math (to be measured)
