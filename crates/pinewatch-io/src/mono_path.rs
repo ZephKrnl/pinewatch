@@ -519,7 +519,9 @@ fn get_full_path_units(style: PathStyle, path: &[u16], cwd: &[u16]) -> Result<Ve
         return Err(argument("The specified path is not of a legal form (empty)."));
     }
     let mut path = if style.is_windows() { windows_drive_adjustment(style, path, cwd)? } else { path.to_vec() };
-    let end = path[path.len() - 1];
+    // `path[path.Length - 1]`: the drive adjustment can leave an empty path (a lone separator and a current
+    // directory without a root), and then the indexer throws.
+    let end = *path.last().ok_or_else(MonoException::index_out_of_range)?;
     let mut canonicalize = true;
     if path.len() >= 2 && style.is_separator(path[0]) && style.is_separator(path[1]) {
         if path.len() == 2 || !path[2..].contains(&path[0]) {

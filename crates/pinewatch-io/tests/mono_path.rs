@@ -117,6 +117,20 @@ fn full_path_windows() {
     );
 }
 
+/// `WindowsDriveAdjustment` replaces a lone `\` or `/` with the current directory's root, and `InsecureGetFullPath`
+/// then reads `path[path.Length - 1]`. A current directory without a root leaves an empty path, so that read throws
+/// `IndexOutOfRangeException` (found by fuzzing; it used to panic).
+#[test]
+fn a_lone_separator_takes_the_current_root() {
+    assert_eq!(get_full_path(Windows, "\\", "C:\\x").unwrap(), "C:\\");
+    assert_eq!(get_full_path(Windows, "/", "D:\\x\\y").unwrap(), "D:\\");
+    for path in ["\\", "/"] {
+        let error = get_full_path(Windows, path, "x").expect_err("an IndexOutOfRangeException");
+        assert_eq!(error.kind, ExceptionKind::IndexOutOfRange);
+        assert_eq!(error.message, "Index was outside the bounds of the array.");
+    }
+}
+
 #[test]
 fn full_path_unix() {
     let cwd = "/x";
