@@ -154,6 +154,34 @@ fn combine_units(style: PathStyle, path1: &[u16], path2: &[u16]) -> Result<Vec<u
     Ok(combined)
 }
 
+/// `Path.Join(path1, path2)`: no invalid-character check, and a separator only where neither part has one.
+pub fn join(style: PathStyle, path1: &str, path2: &str) -> String {
+    let (first, second) = (units(path1), units(path2));
+    if first.is_empty() {
+        return path2.to_string();
+    }
+    if second.is_empty() {
+        return path1.to_string();
+    }
+    if style.is_separator(first[first.len() - 1]) || style.is_separator(second[0]) {
+        format!("{path1}{path2}")
+    } else {
+        format!("{path1}{}{path2}", style.separator())
+    }
+}
+
+/// `PathInternal.TrimEndingDirectorySeparator`: drops one trailing separator unless the path is a root (judged
+/// with `GetPathRoot`, see V22).
+pub fn trim_ending_directory_separator(style: PathStyle, path: &str) -> String {
+    let units = units(path);
+    match units.last() {
+        Some(&last) if style.is_separator(last) && get_path_root(style, &units).ok().as_deref() != Some(&units[..]) => {
+            text(&units[..units.len() - 1])
+        }
+        _ => path.to_string(),
+    }
+}
+
 /// `Path.GetFileName(path)`.
 pub fn get_file_name(style: PathStyle, path: &str) -> Result<String, MonoException> {
     Ok(text(get_file_name_units(style, &units(path))?))

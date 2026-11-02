@@ -6,4 +6,4 @@ pub mod mono_path;
 pub mod steam;
 
 pub use install::{InstallNotFound, InstallRoot, find_install};
-pub use log::{LogLevel, LogSink, MemoryLog, StderrLog};
+pub use log::{LogLevel, LogSink, MemoryLog, StderrLog, log_exception, log_exception_only};

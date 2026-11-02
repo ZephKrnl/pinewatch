@@ -85,6 +85,8 @@ and the license notices are in `NOTICES-PORTED-CODE.md`.
   - (a) reading from a missing folder inside the install does not create that folder
   - (b) on a read-only install, or when another program blocks write access, the original fails to open the file and Rust doesn't
   - (c) Rust keeps saves in its own folder with byte-identical contents
+  - (d) when the install has no `Sandbox` folder, the asset loader creates it; Rust doesn't, so no sandbox locations
+    are searched in either case
   - Inside save folders, Rust reproduces the original's folder and file creation exactly.
 - **Detection:** the read-only file handle has no write methods, and a test checks the install is unchanged after a full scan.
 
@@ -136,3 +138,13 @@ and the license notices are in `NOTICES-PORTED-CODE.md`.
 - **Why it can't match:** those assemblies need the original C# types and a .NET runtime. Pinewatch has neither, by design (R1).
 - **Rust:** will read the manifests exactly, but can't run the assemblies. Data-only mods (asset folders, maps) are unaffected.
 - **Detection:** the mod-loading step will report every assembly it can't load.
+
+### L11. No Steam workshop yet
+- **Original:** the client's asset and level discovery includes the workshop items the player subscribes to
+  (`AddClientUgcSearchLocations`, the workshop part of `ScanKnownLevels`).
+- **Why it can't match yet:** Pinewatch has no Steam integration (M7 and later).
+- **Rust:** behaves like a client with the workshop service running and no subscriptions: no workshop search
+  locations or levels. `ScanKnownLevels`' branch for a missing workshop service (legacy server folders, which it
+  creates) is never taken, as on any Steam client.
+- **Detection:** reference runs use an account without subscriptions, or compare only non-workshop locations.
+

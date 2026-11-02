@@ -44,6 +44,8 @@ pub const FORMAT_GUID_INV_LEN: &str =
 pub const FORMAT_GUID_INVALID_CHAR: &str = "Guid string should only contain hexadecimal characters.";
 pub const FORMAT_GUID_UNRECOGNIZED: &str = "Unrecognized Guid format.";
 pub const FORMAT_NO_PARSIBLE_DIGITS: &str = "Could not find any recognizable digits.";
+/// `SR.IO_PathNotFound_Path`: `DirectoryNotFoundException` for a missing folder, with the full path.
+pub const IO_PATH_NOT_FOUND_PATH: &str = "Could not find a part of the path '{0}'.";
 pub const OVERFLOW_BYTE: &str = "Value was either too large or too small for an unsigned byte.";
 pub const OVERFLOW_INT16: &str = "Value was either too large or too small for an Int16.";
 pub const OVERFLOW_INT32: &str = "Value was either too large or too small for an Int32.";
@@ -81,6 +83,7 @@ pub const ALL: &[&str] = &[
     FORMAT_GUID_INVALID_CHAR,
     FORMAT_GUID_UNRECOGNIZED,
     FORMAT_NO_PARSIBLE_DIGITS,
+    IO_PATH_NOT_FOUND_PATH,
     OVERFLOW_BYTE,
     OVERFLOW_INT16,
     OVERFLOW_INT32,

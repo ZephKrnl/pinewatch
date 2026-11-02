@@ -121,6 +121,21 @@ isn't set up. Each entry says what the Rust code does, where the behavior came f
   drive letter; and the culture-aware `String.Compare` of UNC server names in `SameRoot`, compared ordinally ignoring
   case here. **Check:** a harness sweep of `Path` calls on generated paths, including these forms.
 
+## `pinewatch-assets`
+
+- **V21. Build configuration.** The shipped Windows client is assumed to be built with `WITH_NOREDIST` and without
+  `UNITY_EDITOR`, `DEVELOPMENT_BUILD` or `DEDICATED_SERVER`. The SDK project doesn't define `WITH_NOREDIST`, but it
+  replaces the plugins the shipped game has (for example the highlighter, `HighlightFallback`) only when it's
+  missing. It decides, among others, that the core `Bundles` location is added without checking that it exists,
+  that `Maps` isn't looked up in the Steam install, and that `MasterBundleConfig.getAssetBundlePath` is
+  `Path.Combine(directory, name)`. **Check:** the shipped `Assembly-CSharp.dll`'s IL for `Assets.LoadAllAssets`
+  (no `Directory.Exists` before the core location) and `MasterBundleConfig.getAssetBundlePath` (no
+  `Provider.steamAppInstallDirectory`).
+- **V23. Level discovery messages (gap).** The asset search needs only which `Maps` folders are levels:
+  `ReadLevelInfo` accepts a folder whose `Level.dat` exists and reads, and Pinewatch logs `Discovered level ...` for
+  it. Not yet produced: `Unable to parse <map>/Config.json! ...` and the level version error, which need the JSON
+  reader, and `Level.dat`'s fields. **Fix:** level info with `pinewatch-json`.
+
 ## `pinewatch-kvt`
 
 - **V9. Hierarchy hash (later step).** `LevelHierarchy.load` hashes the bytes its `StreamReader` pulled through

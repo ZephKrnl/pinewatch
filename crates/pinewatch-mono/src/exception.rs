@@ -15,6 +15,8 @@ pub enum ExceptionKind {
     Argument,
     ArgumentNull,
     ArgumentOutOfRange,
+    /// `System.IO.DirectoryNotFoundException`.
+    DirectoryNotFound,
     /// `System.IO.FileLoadException`, which `Type.GetType` throws even with `throwOnError: false`.
     FileLoad,
     Format,
@@ -33,6 +35,7 @@ impl ExceptionKind {
             Self::Argument => "System.ArgumentException",
             Self::ArgumentNull => "System.ArgumentNullException",
             Self::ArgumentOutOfRange => "System.ArgumentOutOfRangeException",
+            Self::DirectoryNotFound => "System.IO.DirectoryNotFoundException",
             Self::FileLoad => "System.IO.FileLoadException",
             Self::Format => "System.FormatException",
             Self::IndexOutOfRange => "System.IndexOutOfRangeException",

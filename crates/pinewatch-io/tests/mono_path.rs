@@ -142,3 +142,19 @@ fn install_root_full_name() {
     assert_eq!(root_full_name(Unix, "/home/u/x/../Unturned/", "/x").unwrap(), "/home/u/Unturned");
     assert_eq!(root_full_name(Unix, "Unturned", "/x").unwrap(), "/x/Unturned");
 }
+
+#[test]
+fn join_and_trim() {
+    use pinewatch_io::mono_path::{join, trim_ending_directory_separator};
+    assert_eq!(join(Windows, "C:\\a", "b"), "C:\\a\\b");
+    assert_eq!(join(Windows, "C:\\a\\", "b"), "C:\\a\\b");
+    assert_eq!(join(Windows, "C:\\a", "/b"), "C:\\a/b");
+    assert_eq!(join(Windows, "a|", "b"), "a|\\b");
+    assert_eq!(join(Windows, "", "b"), "b");
+    assert_eq!(join(Unix, "/a", "b"), "/a/b");
+    assert_eq!(join(Unix, "/a\\", "b"), "/a\\/b");
+    assert_eq!(trim_ending_directory_separator(Windows, "C:\\a\\"), "C:\\a");
+    assert_eq!(trim_ending_directory_separator(Windows, "C:\\"), "C:\\");
+    assert_eq!(trim_ending_directory_separator(Unix, "/a/"), "/a");
+    assert_eq!(trim_ending_directory_separator(Unix, "/"), "/");
+}
