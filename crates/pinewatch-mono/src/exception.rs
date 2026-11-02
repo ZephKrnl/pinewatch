@@ -24,6 +24,8 @@ pub enum ExceptionKind {
     Format,
     IndexOutOfRange,
     InvalidCast,
+    /// `System.MissingMethodException`.
+    MissingMethod,
     Io,
     NullReference,
     OutOfMemory,
@@ -43,6 +45,7 @@ impl ExceptionKind {
             Self::Format => "System.FormatException",
             Self::IndexOutOfRange => "System.IndexOutOfRangeException",
             Self::InvalidCast => "System.InvalidCastException",
+            Self::MissingMethod => "System.MissingMethodException",
             Self::Io => "System.IO.IOException",
             Self::NullReference => "System.NullReferenceException",
             Self::OutOfMemory => "System.OutOfMemoryException",

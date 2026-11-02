@@ -26,6 +26,9 @@ pub const ARG_OVERFLOW_EXCEPTION: &str = "Arithmetic operation resulted in an ov
 pub const ARG_PARAM_NAME_NAME: &str = "Parameter name: {0}";
 pub const ARGUMENT_INVALID_NUMBER_STYLES: &str = "An undefined NumberStyles value is being used.";
 pub const ARGUMENT_NULL_GENERIC: &str = "Value cannot be null.";
+/// `SR.ArgumentOutOfRange_StartIndexLargerThanLength`, from `String.Substring`.
+pub const ARGUMENT_OUT_OF_RANGE_START_INDEX_LARGER_THAN_LENGTH: &str =
+    "startIndex cannot be larger than length of string.";
 pub const ARGUMENT_OUT_OF_RANGE_INDEX: &str =
     "Index was out of range. Must be non-negative and less than the size of the collection.";
 pub const FORMAT_EMPTY_INPUT_STRING: &str = "Input string was either empty or contained only whitespace.";
@@ -44,6 +47,8 @@ pub const FORMAT_GUID_INV_LEN: &str =
 pub const FORMAT_GUID_INVALID_CHAR: &str = "Guid string should only contain hexadecimal characters.";
 pub const FORMAT_GUID_UNRECOGNIZED: &str = "Unrecognized Guid format.";
 pub const FORMAT_NO_PARSIBLE_DIGITS: &str = "Could not find any recognizable digits.";
+/// `SR.MissingMethod_Name`, from `MissingMethodException.Message` when it has a class name.
+pub const MISSING_METHOD_NAME: &str = "Method '{0}' not found.";
 /// `SR.IO_PathNotFound_Path`: `DirectoryNotFoundException` for a missing folder, with the full path.
 pub const IO_PATH_NOT_FOUND_PATH: &str = "Could not find a part of the path '{0}'.";
 pub const OVERFLOW_BYTE: &str = "Value was either too large or too small for an unsigned byte.";
@@ -70,6 +75,7 @@ pub const ALL: &[&str] = &[
     ARG_PARAM_NAME_NAME,
     ARGUMENT_INVALID_NUMBER_STYLES,
     ARGUMENT_NULL_GENERIC,
+    ARGUMENT_OUT_OF_RANGE_START_INDEX_LARGER_THAN_LENGTH,
     ARGUMENT_OUT_OF_RANGE_INDEX,
     FORMAT_EMPTY_INPUT_STRING,
     FORMAT_EXTRA_JUNK_AT_END,
@@ -84,6 +90,7 @@ pub const ALL: &[&str] = &[
     FORMAT_GUID_UNRECOGNIZED,
     FORMAT_NO_PARSIBLE_DIGITS,
     IO_PATH_NOT_FOUND_PATH,
+    MISSING_METHOD_NAME,
     OVERFLOW_BYTE,
     OVERFLOW_INT16,
     OVERFLOW_INT32,

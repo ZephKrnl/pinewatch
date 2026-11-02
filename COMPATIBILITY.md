@@ -87,6 +87,9 @@ and the license notices are in `NOTICES-PORTED-CODE.md`.
   - (c) Rust keeps saves in its own folder with byte-identical contents
   - (d) when the install has no `Sandbox` folder, the asset loader creates it; Rust doesn't, so no sandbox locations
     are searched in either case
+  - (e) a definition without `GUID` (and without `Metadata`) gets a new random GUID that the asset loader writes
+    into the file, logging `Assigned GUID <guid> to asset "<path>"`; Rust uses a new random GUID in memory, writes
+    nothing and logs nothing, so the GUID changes on every run
   - Inside save folders, Rust reproduces the original's folder and file creation exactly.
 - **Detection:** the read-only file handle has no write methods, and a test checks the install is unchanged after a full scan.
 

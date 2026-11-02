@@ -151,6 +151,19 @@ isn't set up. Each entry says what the Rust code does, where the behavior came f
   treats every load as successful, as the game's own bundles are. Unity refuses a second bundle with the same
   content, and the game then logs `Using "<name>" in "<dir>" as fallback asset bundle for "<dir>"` or one of the
   `Unable to ...` messages; that needs the bundle reader (M2d). **Fix:** read the bundle header with M2d.
+- **V26. Culture-sensitive comparisons in asset loading (gap).** `findMasterBundleByPath` uses `string.StartsWith`
+  (current culture), `findMasterBundleByName` `InvariantCultureIgnoreCase`, the core bundle check
+  `InvariantCulture`, and `ItemAsset.GetTypeFriendlyName` `StartsWith("Item ")`. Pinewatch compares ordinally
+  (ignoring case where the C# does), which is the same for paths and names without characters that Mono's
+  collation ignores or treats specially, as in V20. **Fix:** Mono's collation tables.
+- **V27. Loading order and constructor failures.** Definitions wait for the core master bundle and then load in
+  arrival order; without a core master bundle none loads and the original's loading loop never ends (Pinewatch
+  reports them as pending). Legacy per-asset `.unity3d` bundles aren't loaded (M2d), only named. `Activator.
+  CreateInstance` on the one abstract asset class, `FoliageInfoAsset`, throws Mono's `MissingMethodException`
+  built with its two-string constructor, so the message reads `Method 'Cannot create an abstract class '{0}'..
+  SDG.Framework.Foliage.FoliageInfoAsset' not found.` (from Mono's `RuntimeType.CreateInstanceSlow` and corefx's
+  `MissingMethodException.Message`). **Check:** the abstract-class message in the shipped runtime, and the core
+  bundle wait with a test install.
 
 ## `pinewatch-kvt`
 

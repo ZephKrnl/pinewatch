@@ -1,6 +1,7 @@
 //! The game's asset system (`Assets` and `AssetsWorker` in the U3 SDK): search locations, the folder walk,
 //! definitions and translations, master bundles, and the asset index. See `docs/superpowers/plans/` (M2c).
 
+mod load;
 mod master_bundle;
 mod origin;
 mod paths;
@@ -9,6 +10,7 @@ mod search;
 mod types;
 mod worker;
 
+pub use load::{AssetHeader, AssetLoader};
 pub use master_bundle::{MasterBundleConfig, asset_bundle_version};
 pub use origin::{AssetOrigin, OriginId, Origins};
 pub use paths::MonoPath;
