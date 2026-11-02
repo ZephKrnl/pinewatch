@@ -207,13 +207,19 @@ isn't set up. Each entry says what the Rust code does, where the behavior came f
   `MemoryExtensions.ToUpperInvariant`, `TextInfo.ChangeCase`, `TextInfo.ToUpper(char)`), and V3's tables.
 - **V19. Type names in `.dat` values (gap).** `ParseType` calls `Type.GetType(name, false, ignoreCase: true)`, which
   searches the calling assembly (`UnturnedDat.dll`) and `mscorlib.dll` unless the name says which assembly, and
-  matches case-insensitively. Pinewatch asks a `TypeResolver`, and no resolver knows the game's types yet, as in V10.
+  matches case-insensitively. Pinewatch asks a `TypeResolver`. Since M2c, `pinewatch_assets::AssetTypeResolver`
+  knows the 95 asset classes of the SDK: an assembly-qualified name with `Assembly-CSharp` (ignoring case, with any
+  further properties) and the full class name (ignoring ASCII case) resolve; an unqualified name doesn't, since
+  `UnturnedDat.dll` and `mscorlib.dll` hold no asset class. Other types `Type.GetType` would find (non-asset classes,
+  arrays, nested or generic types) aren't known, so a definition naming one gets `Unable to parse Metadata.Type`
+  where the game says `Type "<name>" is not a valid asset type`.
   The checks before the lookup (null or empty value, `\`, `:` or `/` in the name) are ported. `throwOnError: false`
   doesn't stop every exception: `Type.GetType` still throws some, for example `FileLoadException` for an
   assembly-qualified name whose assembly is found but can't be loaded, and `ParseType` doesn't catch them. So
   `TypeResolver::resolve` returns a `Result`, and `parse_type` passes its error on. **Fix:** a type registry built
   from the shipped assemblies, with `Type.GetType`'s name matching. **Check:** which exceptions Mono's
-  `Type.GetType(name, false, true)` throws for malformed and assembly-qualified names.
+  `Type.GetType(name, false, true)` throws for malformed and assembly-qualified names; how its type-name parser
+  treats spaces, `+`, `[]` and version properties; and how it compares names ignoring case.
 - **V20. Legacy `readBoolean` comparison (gap).** `Data.readBoolean` compares with `"y"` and `"true"` using
   `StringComparison.InvariantCultureIgnoreCase`, a linguistic comparison through Mono's collation tables, which skips
   ignorable characters such as U+00AD (soft hyphen). Pinewatch compares code units ignoring case, so it matches for
