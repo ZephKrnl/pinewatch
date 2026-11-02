@@ -7,6 +7,7 @@
 mod boolean;
 mod case_tables;
 pub mod chars;
+mod dictionary;
 mod enums;
 mod exception;
 mod guid;
@@ -18,6 +19,7 @@ pub mod sr;
 mod text;
 
 pub use boolean::try_parse_bool;
+pub use dictionary::MonoDictionary;
 pub use enums::{EnumInfo, EnumUnderlying, NetEnum, try_parse_enum};
 pub use exception::{ExceptionKind, MonoException, NEW_LINE};
 pub use guid::Guid;

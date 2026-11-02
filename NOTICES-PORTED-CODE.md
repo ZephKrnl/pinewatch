@@ -23,6 +23,7 @@ Ported from `mono/corefx` at `5b4edb9b0a721aed60c9c8ddeed441bdd7451e42` and `mon
 | `crates/pinewatch-mono/src/chars.rs` | corefx `Char.cs` (`IsWhiteSpaceLatin1`), `Globalization/CharUnicodeInfo.cs` (`IsWhiteSpace`) and the separator code units of `Globalization/CharUnicodeInfoData.cs` |
 | `crates/pinewatch-mono/src/boolean.rs` | corefx `Boolean.cs` (`TryParse`, `TrimWhiteSpaceAndNull`) |
 | `crates/pinewatch-mono/src/sr.rs` | corefx resource strings, as Mono's `mcs/class/corlib/corefx/SR.cs` carries them |
+| `crates/pinewatch-mono/src/dictionary.rs` | corefx `src/Common/src/CoreLib/System/Collections/Generic/Dictionary.cs` (slot order and the free list) |
 | `crates/pinewatch-unity/src/lib.rs` | corefx `src/Common/src/CoreLib/System/Single.cs` (`Equals(float)`) |
 | `crates/pinewatch-io/src/mono_path.rs` | corefx `src/System.IO.FileSystem/src/System/IO/DirectoryInfo.cs` (`Parent`) |
 | `crates/pinewatch-dat/src/unity_ex.rs` | corefx `src/Common/src/CoreLib/System/String.Searching.cs` (the `startIndex` check of `IndexOf(char, int, int)`) |

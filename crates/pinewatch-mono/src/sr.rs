@@ -12,6 +12,8 @@
 //! `mcs/class/corlib/ReferenceSources/SR.cs` in Unity's Mono. The install test `shipped_mscorlib` checks that each
 //! one is a string literal in the shipped `mscorlib.dll`.
 
+/// `SR.Argument_AddingDuplicateWithKey`, from `Dictionary.Add`.
+pub const ARGUMENT_ADDING_DUPLICATE_WITH_KEY: &str = "An item with the same key has already been added. Key: {0}";
 pub const ARG_ARGUMENT_OUT_OF_RANGE_EXCEPTION: &str = "Specified argument was out of the range of valid values.";
 pub const ARG_CANNOT_HAVE_NEGATIVE_VALUE: &str = "String cannot contain a minus sign if the base is not 10.";
 pub const ARG_HEX_STYLE_NOT_SUPPORTED: &str =
@@ -63,6 +65,7 @@ pub const OVERFLOW_UINT64: &str = "Value was either too large or too small for a
 
 /// Every string above, for the install test.
 pub const ALL: &[&str] = &[
+    ARGUMENT_ADDING_DUPLICATE_WITH_KEY,
     ARG_ARGUMENT_OUT_OF_RANGE_EXCEPTION,
     ARG_CANNOT_HAVE_NEGATIVE_VALUE,
     ARG_HEX_STYLE_NOT_SUPPORTED,
