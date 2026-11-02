@@ -77,6 +77,12 @@ impl InstallRoot {
         Ok(bytes)
     }
 
+    /// Opens a file with read access only, for readers that stream it (a hash over a large file).
+    pub fn open_read(&self, rel: &str) -> io::Result<impl Read + use<>> {
+        let path = self.resolve(rel)?;
+        fs::OpenOptions::new().read(true).open(path)
+    }
+
     /// True if `rel` is an existing file (like `File.Exists`).
     pub fn exists(&self, rel: &str) -> bool {
         self.resolve(rel).is_ok_and(|p| p.is_file())

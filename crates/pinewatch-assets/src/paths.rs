@@ -38,6 +38,14 @@ impl MonoPath {
         Self { full: mono_path::join(STYLE, &self.full, name), rel: self.rel_child(name) }
     }
 
+    /// `Path.GetDirectoryName(full)` for a file the searcher found. Only a root has none; the C# would then fail in
+    /// its next `Path.Combine` with `ArgumentNullException`, which is the error here.
+    pub(crate) fn parent(&self) -> Result<Self, MonoException> {
+        let full = mono_path::get_directory_name(STYLE, &self.full)?.ok_or_else(|| MonoException::argument_null("path1"))?;
+        let rel = self.rel.rsplit_once('/').map_or(String::new(), |(parent, _)| parent.to_string());
+        Ok(Self { full, rel })
+    }
+
     /// `Path.GetFullPath(full)`, for the same place.
     pub(crate) fn full_path(&self) -> Result<Self, MonoException> {
         Ok(Self { full: mono_path::get_full_path(STYLE, &self.full, &current_directory())?, rel: self.rel.clone() })

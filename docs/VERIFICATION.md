@@ -130,7 +130,8 @@ isn't set up. Each entry says what the Rust code does, where the behavior came f
   that `Maps` isn't looked up in the Steam install, and that `MasterBundleConfig.getAssetBundlePath` is
   `Path.Combine(directory, name)`. **Check:** the shipped `Assembly-CSharp.dll`'s IL for `Assets.LoadAllAssets`
   (no `Directory.Exists` before the core location) and `MasterBundleConfig.getAssetBundlePath` (no
-  `Provider.steamAppInstallDirectory`).
+  `Provider.steamAppInstallDirectory`). Pinewatch follows the Windows client on every host; the Linux client would
+  first look for `<name>_linux` bundles (`UNITY_STANDALONE_LINUX`).
 - **V23. Level discovery messages (gap).** The asset search needs only which `Maps` folders are levels:
   `ReadLevelInfo` accepts a folder whose `Level.dat` exists and reads, and Pinewatch logs `Discovered level ...` for
   it. Not yet produced: `Unable to parse <map>/Config.json! ...` and the level version error, which need the JSON
@@ -145,6 +146,11 @@ isn't set up. Each entry says what the Rust code does, where the behavior came f
   the location reading forever, where Pinewatch returns an error. File-system names can't hold the characters that
   throw. **Check:** enumeration order and `*.asset` matching on the reference machine, including a folder with
   mixed-case extensions.
+- **V25. Loading master bundles (gap).** The reader reads each master bundle config and hashes its bundle file
+  (SHA-1 of the whole file, as `SHA1Stream` sees it); the main thread then has Unity load the bundle. Pinewatch
+  treats every load as successful, as the game's own bundles are. Unity refuses a second bundle with the same
+  content, and the game then logs `Using "<name>" in "<dir>" as fallback asset bundle for "<dir>"` or one of the
+  `Unable to ...` messages; that needs the bundle reader (M2d). **Fix:** read the bundle header with M2d.
 
 ## `pinewatch-kvt`
 
