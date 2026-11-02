@@ -76,13 +76,12 @@ pub fn main() -> ExitCode {
         }
     };
 
-    if let Some(path) = &cli.screenshot {
-        if let Some(parent) = path.parent().filter(|p| !p.as_os_str().is_empty()) {
-            if let Err(error) = std::fs::create_dir_all(parent) {
-                eprintln!("Can't create {}: {error}", parent.display());
-                return ExitCode::from(2);
-            }
-        }
+    if let Some(path) = &cli.screenshot
+        && let Some(parent) = path.parent().filter(|p| !p.as_os_str().is_empty())
+        && let Err(error) = std::fs::create_dir_all(parent)
+    {
+        eprintln!("Can't create {}: {error}", parent.display());
+        return ExitCode::from(2);
     }
 
     run(LoadedTerrain { map, tiles }, cli.screenshot)
@@ -134,11 +133,11 @@ fn run(terrain: LoadedTerrain, screenshot: Option<PathBuf>) -> ExitCode {
 
     match app.run() {
         AppExit::Success => {
-            if let Some((path, before)) = expected {
-                if !was_written(&path, before) {
-                    eprintln!("The screenshot wasn't saved to {}", path.display());
-                    return ExitCode::from(5);
-                }
+            if let Some((path, before)) = expected
+                && !was_written(&path, before)
+            {
+                eprintln!("The screenshot wasn't saved to {}", path.display());
+                return ExitCode::from(5);
             }
             ExitCode::SUCCESS
         }

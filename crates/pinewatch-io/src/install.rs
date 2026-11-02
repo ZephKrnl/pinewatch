@@ -119,10 +119,10 @@ pub fn find_install(cli: Option<PathBuf>) -> Result<InstallRoot, InstallNotFound
     let skipped = "not checked".to_string();
 
     if let Some(path) = cli {
-        if looks_like_install(&path) {
-            if let Ok(root) = InstallRoot::open(&path) {
-                return Ok(root);
-            }
+        if looks_like_install(&path)
+            && let Ok(root) = InstallRoot::open(&path)
+        {
+            return Ok(root);
         }
         return Err(InstallNotFound { cli: not_an_install(&path), env: skipped.clone(), steam: skipped });
     }
@@ -130,10 +130,10 @@ pub fn find_install(cli: Option<PathBuf>) -> Result<InstallRoot, InstallNotFound
     let env = match std::env::var_os(INSTALL_DIR_ENV) {
         Some(value) if !value.is_empty() => {
             let path = PathBuf::from(value);
-            if looks_like_install(&path) {
-                if let Ok(root) = InstallRoot::open(&path) {
-                    return Ok(root);
-                }
+            if looks_like_install(&path)
+                && let Ok(root) = InstallRoot::open(&path)
+            {
+                return Ok(root);
             }
             return Err(InstallNotFound { cli: "not given".into(), env: not_an_install(&path), steam: skipped });
         }
