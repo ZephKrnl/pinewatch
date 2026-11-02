@@ -148,8 +148,14 @@ with or without the `& 0xFF` mask.
   `token(&self) -> &JsonToken`, `depth(&self) -> i32`, `path(&self) -> String`. Errors are `JsonReaderException`s with
   `JsonPosition.FormatMessage`'s ` Path '…', line N, position M.` suffix.
 
+- [ ] **Step 0: Unicode categories first.** `ParseValue` sends any `char.IsNumber` character to the number parser
+  (so `²` fails as a number, not as a value), and `ParseUnquotedProperty` accepts `char.IsLetterOrDigit` ones.
+  `pinewatch-mono` has no category table yet: port `CharUnicodeInfo.GetUnicodeCategory` from corefx
+  `CharUnicodeInfoData` (mono/corefx `5b4edb9b`, as the casing tables were, V3) with `chars::is_number` and
+  `chars::is_letter_or_digit`, checksummed over all 65,536 code units like the casing tables. Commit it alone.
 - [ ] **Step 1: Write the failing tests**, ported from `JsonTextReader.cs` and `JsonReader.cs`:
-  - `values_and_structure`: `{"a": [1, -2.5, "s", true, null], 'b': undefined}` gives the tokens in order.
+  - `values_and_structure`: `{"a": [1, -2.5, "s", true, null], 'b': undefined}` gives the tokens in order; a bare
+    comma is an `Undefined` value (`ParseValue` doesn't move past it), so `[1,,2]` gives `1, Undefined, 2`.
   - `lenient_syntax`: `// x` and `/* y */` give `Comment(" x")`, `Comment(" y")`; `{a_1$: 1}` gives the name
     `a_1$`; `[1,]` gives `StartArray, Integer(1), EndArray`.
   - `numbers`: `0x1F` → 31, `017` → 15 (octal), `1e3` → `Float(1000.0)`, `NaN`, `Infinity`, `-Infinity` → floats,

@@ -131,7 +131,7 @@ V23's messages and the level's `Allow_Holiday_Redirects` (V14). It adds the step
 |---|---|---|
 | 1 `Block` | Done | `pinewatch-binary::Block` (every reader but `readSingleQuaternion` and `read(Type…)`); `pinewatch_mono::utf8_get_string` (`Encoding.UTF8.GetString`, flushed) |
 | 2 `Level.dat`, packed version | Done | `read_level_file` (`LevelFile`, `ELevelSize`, `ELevelType`), `try_parse_packed_version` (`Parser.TryGetUInt32FromIP`, out value included) |
-| 3 to 6 `pinewatch-json` | Not started | Reader, typed reads, `object` values, typed deserialization |
+| 3 to 6 `pinewatch-json` | Not started | Reader, typed reads, `object` values, typed deserialization. Task 3 starts with Unicode categories in `pinewatch-mono` (its step 0). The Json.NET 13.0.3 sources are fetched from GitHub at commit `0a2e291c` into the session scratchpad, not the repository |
 | 7 `LevelInfoConfigData`, `ReadLevelInfo` | Not started | |
 
 New entry: V30 (`new byte[negative]`'s message).
