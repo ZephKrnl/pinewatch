@@ -29,7 +29,9 @@ Early development, milestone M2a: Pinewatch boots, finds your Unturned installat
 from its landscape tiles. It also has a reader for `.dat` and `.asset` files, ported from the game's `DatParser`
 and value helpers and from Mono's number, bool, GUID and enum parsing. Every installed file parses without a panic,
 but the reference harness hasn't compared the results with the original game yet; `docs/VERIFICATION.md` lists
-what it must check. Terrain colors are temporary placeholders until later M2 steps bring the original materials.
+what it must check. The asset system (milestone M2c: search locations, definitions, master bundles, asset headers
+and types) is in progress. Terrain colors are temporary placeholders until later M2 steps bring the original
+materials.
 See `docs/ARCHITECTURE.md` for the milestones.
 
 ## Requirements

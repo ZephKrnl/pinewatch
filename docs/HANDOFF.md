@@ -1,28 +1,27 @@
 # Handoff
 
-The state of Pinewatch on 2026-11-02 (updated at the end of the first cloud session), written so work can resume
+The state of Pinewatch on 2026-11-02, updated at the end of the second cloud session, written so work can resume
 from this file alone.
 
 ## Where things stand
 
-- **Current branch:** `main-9m65p0`, the branch the cloud session was given. It holds `main` plus the M2a review
-  fixes below, and is pushed. **`main` was not fast-forwarded**: the fixes still need the Windows run (see "Exact
-  next steps").
+- **Current branch:** `main-9m65p0`, the branch the cloud sessions were given, pushed to `origin`. It holds `main`
+  plus everything listed under "Done in the cloud sessions". **`main` was not fast-forwarded**: that work still needs
+  the Windows run (see "Exact next steps").
 - **Done:** M1 (the bootable terrain viewer) and M2a (the `.dat` reader) are merged into `main`. On the Windows PC,
   with the game installed, `cargo test --workspace` passes all 396 tests on `main` and skips none.
-- **Linux (cloud session, 2026-11-02):** on `main-9m65p0`, `cargo test --workspace` passes 403 tests (the install
-  tests print `skipped: no Unturned install found`; the Windows-only test doesn't build), `cargo clippy --workspace
-  --all-targets` gives no warnings, and `cargo xtask check-deps` passes. Setup it needed: `apt-get install
-  libasound2-dev libudev-dev libwayland-dev libxkbcommon-dev` (pkg-config was present), `rustup component add
-  clippy`, and `cargo fetch`, because `check-deps` runs `cargo tree --target all --offline` and a fresh machine
-  lacks the Windows-only crates.
+- **Linux (cloud):** on `main-9m65p0`, `cargo test --workspace` passes 463 tests (the install tests print
+  `skipped: no Unturned install found`; the Windows-only test doesn't build), `cargo clippy --workspace --all-targets`
+  gives no warnings, and `cargo xtask check-deps` passes for the 7 format crates. Setup a fresh Linux machine needs:
+  `apt-get install libasound2-dev libudev-dev libwayland-dev libxkbcommon-dev` (pkg-config was present),
+  `rustup component add clippy`, and `cargo fetch` (`check-deps` runs `cargo tree --target all --offline`).
 - **Remote:** `origin` is the private GitHub repository `ZephKrnl/pinewatch`. It stays private.
 - **Branches** (all pushed to `origin`):
 
   | Branch | What it holds |
   |---|---|
-  | `main` | M1, M2a, the M2a review fixes and the handoff note (`480c1ca`) |
-  | `main-9m65p0` | `main` plus the M2a minor findings and two Linux test fixes (cloud session) |
+  | `main` | M1, M2a, the M2a review fixes and the first handoff note (`480c1ca`) |
+  | `main-9m65p0` | `main` plus the cloud sessions' work below |
   | `milestone/m2a-dat-reader` | The M2a work, merged into `main` by fast-forward (`b230803`) |
   | `milestone/m1-bootable` | The M1 work, merged into `main` (`ad11969`) |
   | `docs/step1-spec` | The step 1 design spec, merged into `main` (`a8c75f6`) |
@@ -38,7 +37,8 @@ from this file alone.
   ```
 
 - **Working from the Windows PC:** `C:\Pinewatch` tracks `origin` (`main` is set up to track `origin/main`). Use
-  `git pull` and `git push` as usual; Git Credential Manager signs in as ZephKrnl.
+  `git pull` and `git push` as usual; Git Credential Manager signs in as ZephKrnl. A cloud session can't reach the
+  PC (only Mac or Linux computers can be attached), so PC work runs in a Claude Code session on the PC itself.
 
 ## Rules that carry over
 
@@ -49,111 +49,139 @@ from this file alone.
 - **Rust only** for production code. The C# in `reference/u3-sdk` is a reference and is never edited.
 - **The Unturned installation is never modified.** Tests and tools only read it.
 - **Commits** are authored `Zeph <205350396+ZephKrnl@users.noreply.github.com>` (set in the repository's local Git
-  config). No `Co-Authored-By` lines and no AI attribution. The existing history stays exactly as it is.
+  config). No `Co-Authored-By` lines and no AI attribution, including no `Claude-Session` trailer. The existing
+  history stays exactly as it is.
 - **The repository stays private.** Never push credentials, game files or other third-party assets.
-- **Development resumes only on the owner's explicit command.**
+- **Development resumes only on the owner's explicit command.** On 2026-11-02 the owner ordered autonomous work
+  through the roadmap ("do not ask me what to do next").
 - `CLAUDE.md` holds these rules for every Claude session, and `.claude/settings.json` turns off the co-author line.
 
-## Unfinished work
+## Done in the cloud sessions (on `main-9m65p0`)
 
-### 1. Eight minor findings from the M2a final review (seven done, on `main-9m65p0`)
-
-Done in the cloud session, one commit each, every one with its test:
+### M2a review findings (seven of eight)
 
 | # | Finding | What was done |
 |---|---|---|
-| 1 | The install walk missed map files | `crates/pinewatch-dat/tests/install.rs` also walks each map's root `.dat` files and `Bundles/`, asserts that map files and a `Maps/*/English.dat` were found, and checks the walk on a made-up install tree. |
-| 3 | V18 | Settled and moved to the end of `docs/VERIFICATION.md`; the `ordered_members` comment is fixed; `equal_values_give_the_same_bits_in_any_order` covers `[1, 1, 0]` and a 20-member enum. |
-| 4 | No independent float bits | `corert_bits_from_an_independent_model` in `crates/pinewatch-mono/tests/floats.rs` pins 27 rows (14 corert quirks, both review cases among them). They came from a separate big-integer model of upstream `Number.CoreRT.cs` (`mono/corert` `11136ad5`); the upstream tables equal the port's, and the model agreed with the port on 20,000 generated decimals. V16 records this. |
-| 5 | Tokenizer comment | Fixed (the SDK blob is LF); the case runs with LF and CRLF. |
-| 6 | README status, V19 | The status line now says the reader isn't yet confirmed by the harness. `TypeResolver::resolve` and both `parse_type` helpers return `Result<_, MonoException>`, `ExceptionKind::FileLoad` is new, and tests check that a resolver's exception propagates. V19 updated. |
-| 7 | Message texts against `UnturnedDat.dll` | New `crates/pinewatch-dat/tests/shipped_messages.rs`: every tokenizer, parser and `Data.cs` message is produced through the port and looked up in the `#US` heap of `UnturnedDat.dll` or `Assembly-CSharp.dll`, as a `string.Format` template or as `string.Concat` pieces. **The assembly half has only been skipped so far**; its first real run is on the PC. |
-| 8 | Six clippy warnings | Fixed; `clippy --workspace --all-targets` is clean on Linux. |
+| 1 | The install walk missed map files | `pinewatch-dat/tests/install.rs` also walks each map's root `.dat` files and `Bundles/`, and checks the walk on a made-up tree. |
+| 3 | V18 | Settled: an unstable sort can't change the result. Test with equal-valued names below and above 16 members. |
+| 4 | No independent float bits | 27 rows (14 corert quirks) from a separate big-integer model of upstream `Number.CoreRT.cs`; the model agreed with the port on 20,000 decimals. V16. |
+| 5 | Tokenizer comment | Fixed; the case runs with LF and CRLF. |
+| 6 | README status, V19 | README says the reader isn't harness-confirmed yet. `TypeResolver::resolve` returns a `Result`; `ExceptionKind::FileLoad`. |
+| 7 | Message texts against the DLLs | `pinewatch-dat/tests/shipped_messages.rs`; its assembly half runs only with the game. |
+| 8 | Six clippy warnings | Fixed. |
 
-Also fixed, because they failed on Linux: the missing-heightmap test in `crates/pinewatch-level/tests/tiles.rs` now
-expects the `/` form there, and the screenshot test in `crates/pinewatch/tests/exe.rs` checks an upper-case install
-path only on Windows and macOS (on Linux it is a different folder). Neither changes production behavior.
+Finding 2 (V17) is now settled at source level (below); the IL check remains for the PC.
 
-Still open:
+### Mono's invariant casing tables (V3, V17)
 
-| # | Finding | Suggested fix, with its regression test |
+`char.ToUpperInvariant`/`ToLowerInvariant` used Rust's Unicode tables, which differ from Mono's invariant culture
+for 252 code units (upper) and 207 (lower): `.dat` keys like `Size`/`ſize` merged and `Boolean.TryParse("falſe")`
+succeeded. `pinewatch-mono` now uses Mono's `TextInfoToUpperData`/`TextInfoToLowerData` (`case_tables.rs`,
+generated from Unity mono `b8eb56f`), with checksums of all 65,536 mappings pinned in `tests/chars.rs`.
+`IsWhiteSpace` above Latin-1 is corefx's 17 separator code units, listed explicitly (it already matched). V17 lists
+the source chain of `OrdinalIgnoreCase` equality and hashing, both folding through `TextInfo.ToUpper`.
+
+### M2c: assets (plan `docs/superpowers/plans/2026-11-02-m2c-assets.md`)
+
+The plan was written and started without the owner's review, under the autonomous order; review it with the code
+on the branch. M2c comes before M2b because M2b needs the PC.
+
+| Task | State | What exists |
 |---|---|---|
-| 2 | V17 can be narrowed. In the shipped IL, `OrdinalIgnoreCase` equality and hashing both fold each `char` through `TextInfo.ToUpper`, so only the table data (V3) is open. | Re-check with the IL dump of the shipped `mscorlib.dll` (Windows PC only), then update V17 in `docs/VERIFICATION.md`. |
+| 1 Mono's path strings | Done | `pinewatch_io::mono_path` (Mono's own `Path.cs`: `Combine`, `Join`, `GetFileName`, `GetDirectoryName`, `GetFullPath`, …, both platform styles); `InstallRoot::full_name` (`UnturnedPaths.RootDirectory.FullName`); the `pinewatch-assets` crate |
+| 2 Origins and search locations | Done | `Origins`, `client_search_locations` (core `Bundles`, `Sandbox` folders, map `Bundles`), `scan_known_levels` |
+| 3 Folder walk | Done | `search_location`: breadth first, `MasterBundle.dat`, `FindAssets` precedence, `*.asset` matching, exact messages |
+| 4 Definitions and translations | Done | `read_location`/`read_items`: one parser per location, SHA-1, parser errors, `<Language>.dat` with English fallback |
+| 5 Master bundles | Done | `MasterBundleConfig` with its exceptions and version rules; bundle file hashed as a stream |
+| 6 Asset headers | Done | `AssetLoader`: master bundles, core bundle wait, `TryLoadFile`, `LoadFile` up to creating the asset (`AssetHeader`) |
+| 7 Asset types | Done | 95 asset classes, the 70 legacy keys, `GetTypeFriendlyName`, `AssetTypeResolver` for `Metadata.Type` |
+| 8 Localization | Not started | `Files/Local.cs` |
+| 9 Asset index | Not started | `AddToMapping` and its messages; needs each type's `FriendlyName` (10 classes override it) and `RedirectorAsset`'s data category |
+| 10 Asset references | Not started | `Files/UnturnedDatEx.cs` and the reference types |
+| 11 `LandscapeMaterialAsset`, holiday redirects | Not started | V14 |
+| 12 The whole install | First part | `pinewatch-assets/tests/install.rs` loads every location up to headers; extend it as tasks 8 to 11 land |
 
-### 2. M2b, the reference harness (not started; no plan written yet)
+New register and verification entries: L3 (d) no `Sandbox` folder is created, L3 (e) a missing GUID is never
+written, L5 made concrete for the asset worker, L11 no workshop yet; V21 the `WITH_NOREDIST` build assumption, V22
+Mono's `Path` rare forms, V23 level discovery's `Config.json` messages, V24 folder enumeration, V25 master bundle
+loading, V26 culture-sensitive comparisons, V27 loading order and constructor failures.
 
-The owner's paused request: design and implement the Unity 2022.3.62f3 reference harness, resolve the compatibility
-gaps V3, V17, V19 and V20 using the original game as the reference, run the reference comparisons, and document any
-remaining differences.
+New resource strings, checked by `shipped_mscorlib` on the PC: `IO_PATH_NOT_FOUND_PATH`,
+`ARGUMENT_OUT_OF_RANGE_START_INDEX_LARGER_THAN_LENGTH`, `MISSING_METHOD_NAME`.
 
-- **Scope in the M2 plan series** (see the table in `docs/superpowers/plans/2026-11-01-m2a-dat-reader.md`): a
-  batch-mode harness (`cargo xtask reference setup/run`), canonical output, `cargo xtask testdata`, runtime-table
-  dumps, and conformance for `pinewatch-mono` and `pinewatch-dat` on every `.dat` and `.asset` file, closing the
-  matching `docs/VERIFICATION.md` entries. `.gitignore` already reserves `/reference/work` (the Unity working copy)
-  and `/testdata` (local copies of game files, never committed).
-- **Found on the Windows PC on 2026-11-02:**
-  - Unity Editor 2022.3.62f3 and 6000.6.7f1 under `C:\Program Files\Unity\Hub\Editor`, and Unity Hub. Whether a
-    license is activated for batch mode wasn't checked.
-  - The .NET Framework C# compiler (`csc.exe`, `ilasm.exe`) and the `dotnet` CLI.
-  - The game ships its own Mono runtime (`MonoBleedingEdge\EmbedRuntime\mono-2.0-bdwgc.dll` and
-    `MonoBleedingEdge\etc`). That runtime with the game's `Unturned_Data\Managed\*.dll` is exactly what the game
-    executes, so it is a candidate for the class-library checks (V3, V17, V20), read-only. Not decided.
-- **What each gap needs:**
-  - V3 (Unicode tables): `IsWhiteSpace`, `ToUpperInvariant` and `ToLowerInvariant` for all 65,536 code units.
-  - V17 (key case folding): the same tables, plus `OrdinalIgnoreCase` equality and hashing on key pairs.
-  - V19 (type names): which names `Type.GetType(name, false, true)` resolves when called from `UnturnedDat.dll`.
-  - V20 (legacy `readBoolean`): `InvariantCultureIgnoreCase` results for `y` and `true` with inserted or replaced
-    characters, including ignorable ones such as U+00AD.
-- **This work needs the Windows PC**, where the game install and Unity are.
+### Linux test fixes
+
+The missing-heightmap test expects the `/` form on Linux, and the screenshot test checks an upper-case install path
+only where file systems ignore case. Neither changes production behavior.
+
+## Unfinished work
+
+### 1. On the Windows PC (needs the game, Unity or the shipped DLLs)
+
+- **The Windows run** of everything on `main-9m65p0`, then fast-forwarding `main` (see "Exact next steps").
+- **Finding 2 / V17:** confirm in the IL of `Unturned_Data\Managed\mscorlib.dll` the chain V17 lists
+  (`OrdinalIgnoreCaseComparer`, `String.Equals(…, OrdinalIgnoreCase)`, `CompareInfo.CompareOrdinalIgnoreCase`,
+  `CompareStringOrdinalIgnoreCase`, `GetIgnoreCaseHash`, `MemoryExtensions.ToUpperInvariant`,
+  `TextInfo.ChangeCase`, `TextInfo.ToUpper(char)`).
+- **V3:** confirm the shipped `TextInfoToUpperData`, `TextInfoToLowerData` and `CharUnicodeInfoData` equal the
+  source (their field data in `mscorlib.dll`, or a harness dump of all 65,536 code units).
+- **V21:** confirm `WITH_NOREDIST` in the shipped `Assembly-CSharp.dll` (V21 names the methods to look at).
+- **M2b, the reference harness** (not started; no plan yet). Scope in the M2a plan's table: a batch-mode harness
+  (`cargo xtask reference setup/run`), canonical output, `cargo xtask testdata`, runtime-table dumps, conformance
+  for `pinewatch-mono`, `pinewatch-dat` and now `pinewatch-assets`. Found on the PC on 2026-11-02: Unity Editor
+  2022.3.62f3 and 6000.6.7f1 under `C:\Program Files\Unity\Hub\Editor` and Unity Hub (license activation for batch
+  mode not checked); `csc.exe`, `ilasm.exe` and the `dotnet` CLI; the game's own Mono runtime
+  (`MonoBleedingEdge\EmbedRuntime\mono-2.0-bdwgc.dll` with `Unturned_Data\Managed\*.dll`), a candidate for the
+  class-library checks, read-only.
+
+### 2. In the cloud (no PC needed)
+
+- **M2c tasks 8 to 11** in the plan's order, then the rest of task 12.
+- Later plans: M2d (asset processor) and M2e (terrain materials) need Unity on the PC.
 
 ### 3. Phone and cloud access
 
-The owner first asked for a GitHub Codespaces setup, then chose to push to GitHub only, because section 2 of the
-U3 SDK License (`LICENSE.txt`) bars using or developing the SDK or any Mod "for or in connection with ... mobile or
-handheld devices", and any environment that enables gameplay on them through cloud-based delivery. No dev container
-exists. Later the same day the owner chose to continue from his phone through a Claude Code cloud session that works
-on this repository while the PC is off. `CLAUDE.md` carries his rules into those sessions.
+Section 2 of the U3 SDK License (`LICENSE.txt`) bars using or developing the SDK or any Mod "for or in connection
+with ... mobile or handheld devices". The owner was told and chose to work from his phone through Claude Code cloud
+sessions anyway. No dev container exists. `CLAUDE.md` carries his rules into those sessions.
 
 ### 4. Loose ends
 
 - 376 old test folders (`pinewatch-*-test-*`) are left in `%TEMP%` on the Windows PC, for the owner to delete.
 - M1's review fixes were never re-reviewed independently.
 
-## Exact next steps, when the owner gives the command
+## Exact next steps
 
-1. **Finish the minor findings on the Windows PC.** `git fetch` and check out `main-9m65p0` (it is `main` plus the
-   fixes, so `main` can fast-forward to it). Do finding 2 with the IL dump and update V17. Run `cargo test
-   --workspace` (expect 404 tests, none skipped; the new install checks, the map walk and the assembly half of
-   `shipped_messages`, run there for the first time), `cargo clippy --workspace --all-targets` and `cargo xtask check-deps`. If `shipped_messages` finds a
-   text missing, compare it with the shipped literal before changing anything: the port must match the DLL. Then
-   fast-forward `main` and push it.
-2. **M2b.** Write the spec and the plan (`docs/superpowers/plans/<date>-m2b-reference-harness.md`) from the scope
-   above, choosing between the Unity Editor in batch mode and the game's own Mono runtime for each check. Then
-   implement it on the Windows PC with tests first, run the comparisons, and update `docs/VERIFICATION.md` and
-   `COMPATIBILITY.md` with what they show.
+1. **On the Windows PC:** `git fetch`, check out `main-9m65p0`. Run `cargo test --workspace` (expect 464 tests,
+   none skipped: the Windows-only test, plus the install tests that skip on Linux run for the first time, among them
+   the map walk, `shipped_messages`' assembly half, `shipped_mscorlib` with the three new strings, and the assets
+   install test). If a shipped-text test fails, compare with the DLL before changing anything: the port must match
+   it. Run `cargo clippy --workspace --all-targets` and `cargo xtask check-deps`. Do the V17, V3 and V21 checks above
+   and update `docs/VERIFICATION.md`. Then fast-forward `main` and push it.
+2. **In the cloud or on the PC:** M2c task 8 (localization), then 9, 10, 11 and the rest of 12, test first, one
+   commit per task, as tasks 1 to 7 were done.
+3. **On the PC:** M2b: write its spec and plan, choosing between the Unity Editor in batch mode and the game's own
+   Mono runtime for each check, then implement it test first and record what the comparisons show.
 
-## Decisions from M2a worth knowing
+## Decisions worth knowing
 
-- `DatParseable` has an associated `Context` type, and `try_parse` returns `Result<bool, MonoException>`, because
-  the game's implementations throw and read static game state. The struct helpers pass both along.
-- `try_parse_struct` returns `(bool, T)`: on failure the value can be partly filled, as the C# out value is.
-- `try_get_string` returns `Option<Option<&NetString>>`: a flag's null text counts as found, so `get_string` returns
-  that null rather than the default, as `GetString` does.
-- `try_parse_color32_rgb` returns `(bool, Color32)`, because it fails to opaque black rather than the default.
-- The vector helpers, `legacy_parse_vector3` included, return `Result`, because `String.IndexOf` throws for a value
-  that ends with `(`.
-- `DatComment::join_lines` returns an `Option`, because the C# returns null.
-- `TypeResolver::resolve` returns `Result<Option<TypeHandle>, MonoException>` (cloud session): `Type.GetType` can
-  throw even with `throwOnError: false`, and `ParseType` doesn't catch.
-- Not ported yet: the writers and editable nodes, the twelve `DateTime` test rows, the asset, master-bundle and
-  audio references and the hash in `Data.cs`, `readByteArray`, and `UnturnedDatEx`.
-- Open gaps: V3, V17, V19 and V20 in `docs/VERIFICATION.md`, and L7 (stack depth for extremely deep nesting) in
+- From M2a: `DatParseable` has an associated `Context` type and `try_parse` returns `Result<bool, MonoException>`;
+  `try_parse_struct` returns `(bool, T)`; `try_get_string` returns `Option<Option<&NetString>>` (a flag's null counts
+  as found); `try_parse_color32_rgb` returns `(bool, Color32)`; the vector helpers return `Result`;
+  `DatComment::join_lines` returns an `Option`; `TypeResolver::resolve` returns `Result<Option<TypeHandle>, _>`.
+- From M2c: Pinewatch runs as the shipped Windows client (`WITH_NOREDIST`, V21) on every host; it behaves as a Steam
+  client with no workshop subscriptions (L11); the asset worker's threads become one deterministic order (L5);
+  every path is a Mono string paired with an install-relative path (`MonoPath`); master bundles count as loaded
+  (V25).
+- Not ported yet: the writers and editable nodes, the twelve `DateTime` test rows, the hash in `Data.cs`,
+  `readByteArray`, and `UnturnedDatEx` (M2c task 10).
+- Open gaps: V19 (types beyond the asset classes), V20, V22, V23, V25 and V26 in `docs/VERIFICATION.md`, and L7 in
   `COMPATIBILITY.md`.
 
 ## Where to read more
 
 - `docs/superpowers/specs/2026-11-01-file-format-readers-design.md`: the design spec, with parity rules P1 to P8.
-- `docs/superpowers/plans/`: the M1 and M2a plans.
+- `docs/superpowers/plans/`: the M1, M2a and M2c plans.
 - `COMPATIBILITY.md`: the compatibility rules and the register of known limitations.
 - `docs/VERIFICATION.md`: behaviors that wait for the reference harness.
-- `NOTICES-PORTED-CODE.md`: license notices for the ported .NET code.
+- `NOTICES-PORTED-CODE.md`: license notices for the ported .NET and Mono code.
