@@ -97,12 +97,6 @@ isn't set up. Each entry says what the Rust code does, where the behavior came f
   value is rounded once to 53 bits, and `float` is the cast of that `double`. NaN has the C# constants' bits.
   **Check:** a harness sweep of generated decimals near rounding boundaries, long digit strings and denormals.
 
-- **V18. Enum member order.** `Enum.TryParse` matches names in the order `GetCachedValuesAndNames` returns: Mono's
-  declaration order, sorted by value with `Array.Sort` when the values don't ascend. `Array.Sort` is an introsort,
-  stable up to 16 members but not above. Pinewatch sorts stably. The order only matters for names that differ only
-  by letter case, parsed with `ignoreCase`. **Check:** when each game enum is ported, confirm no two of its names are
-  equal ignoring case; if one is, dump its member order with the harness.
-
 ## `pinewatch-kvt`
 
 - **V9. Hierarchy hash (later step).** `LevelHierarchy.load` hashes the bytes its `StreamReader` pulled through
@@ -139,16 +133,22 @@ isn't set up. Each entry says what the Rust code does, where the behavior came f
 
 ## `pinewatch-dat`
 
-- **V17. Keys that differ only by case (gap).** `DatDictionary` uses `StringComparer.OrdinalIgnoreCase`. Pinewatch
-  treats two keys as equal when every code unit matches after `ToUpperInvariant`, and above ASCII that mapping comes
-  from Rust's Unicode tables, not Mono's (V3). Equal keys merge: the first spelling stays and the last value wins,
-  with a `duplicate key` error. **Check:** non-ASCII key pairs that differ only by case merge, or stay apart, exactly
-  as in the game. That depends on both `Equals` and `GetHashCode` of Mono's `OrdinalIgnoreCase` comparer.
+- **V17. Keys that differ only by case (gap).** `DatDictionary` uses `StringComparer.OrdinalIgnoreCase`. The shipped
+  IL's `OrdinalIgnoreCaseComparer.Equals` calls `String.Equals(..., StringComparison.OrdinalIgnoreCase)`; its
+  non-ASCII path folds each `char` through `TextInfo.ToUpper` (`CompareInfo.CompareStringOrdinalIgnoreCase`).
+  `GetHashCode` folds the same way (`TextInfo.ToUpperInvariant`) before hashing. Pinewatch does the same, and above
+  ASCII that mapping comes from Rust's Unicode tables, not Mono's (V3). Equal keys merge: the first spelling stays
+  and the last value wins, with a `duplicate key` error. **Check:** non-ASCII key pairs that differ only by case
+  merge, or stay apart, exactly as in the game. Only Mono's case tables are open (V3); the comparer's algorithm is
+  settled.
 - **V19. Type names in `.dat` values (gap).** `ParseType` calls `Type.GetType(name, false, ignoreCase: true)`, which
   searches the calling assembly (`UnturnedDat.dll`) and `mscorlib.dll` unless the name says which assembly, and
   matches case-insensitively. Pinewatch asks a `TypeResolver`, and no resolver knows the game's types yet, as in V10.
-  The checks before the lookup (null or empty value, `\`, `:` or `/` in the name) are ported. **Fix:** a type
-  registry built from the shipped assemblies, with `Type.GetType`'s name matching.
+  `throwOnError: false` returns null for a name it doesn't find, but it can still throw for a malformed or
+  assembly-qualified name (for example `FileLoadException` when the assembly can't be loaded); the resolver returns
+  that error and `ParseType` propagates it. The checks before the lookup (null or empty value, `\`, `:` or `/` in
+  the name) are ported. **Fix:** a type registry built from the shipped assemblies, with `Type.GetType`'s name
+  matching.
 - **V20. Legacy `readBoolean` comparison (gap).** `Data.readBoolean` compares with `"y"` and `"true"` using
   `StringComparison.InvariantCultureIgnoreCase`, a linguistic comparison through Mono's collation tables, which skips
   ignorable characters such as U+00AD (soft hyphen). Pinewatch compares code units ignoring case, so it matches for
@@ -166,3 +166,12 @@ Settled 2026-11-01 from the compiled source and the shipped `mscorlib.dll` (V0):
   `ArgumentOutOfRangeException("index", "Index was out of range. Must be non-negative and less than the size of the
   collection.")`. Its NewLine is V2's.
 - **V8. Null dictionary key.** `Dictionary.FindEntry(null)` throws `ArgumentNullException("key")`. Its NewLine is V2's.
+
+Settled 2026-11-03 from the shipped `mscorlib.dll` (V0):
+
+- **V18. Enum member order.** `Enum.TryParse` matches names in the order `GetCachedValuesAndNames` returns: Mono's
+  declaration order, sorted by value with `Array.Sort` when the values don't ascend. `Array.Sort` is an introsort
+  and is not stable, even for a few members (the earlier "stable up to 16" note was wrong); it can reorder names
+  with equal values. Equal values contribute the same bits to `Enum.TryParse`'s result, so the stable sort in
+  Pinewatch gives the same result. Names that differ only by case and have different values are ordered by value,
+  as the sort does. **Check:** none needed; a test covers equal-valued names out of order.

@@ -1,19 +1,22 @@
 # Handoff
 
-The state of Pinewatch on 2026-11-02, written so work can resume from this file alone. Nothing is half-done in the
-tree: the work below was requested and then paused before it started.
+The state of Pinewatch on 2026-11-03, written so work can resume from this file alone. Nothing is half-done in the
+tree: the eight M2a review findings are implemented on `opencode/development` and are waiting for review and merge.
 
 ## Where things stand
 
-- **Current branch:** `main`. The working tree is clean.
-- **Done:** M1 (the bootable terrain viewer) and M2a (the `.dat` reader) are merged into `main`. On the Windows PC,
-  with the game installed, `cargo test --workspace` passes all 396 tests and skips none.
+- **Current branch:** `opencode/development`. The working tree is clean.
+- **Done:** M1 (the bootable terrain viewer) and M2a (the `.dat` reader) are merged into `main`. The eight M2a
+  review findings are done on `opencode/development`. On the Windows PC, with the game installed,
+  `cargo test --workspace` passes all 400 tests and skips none; `cargo clippy --workspace --all-targets` and
+  `cargo xtask check-deps` are clean.
 - **Remote:** `origin` is the private GitHub repository `ZephKrnl/pinewatch`. It stays private.
 - **Branches** (all pushed to `origin`):
 
   | Branch | What it holds |
   |---|---|
-  | `main` | Everything: M1, M2a, the M2a review fixes and this note |
+  | `main` | M1, M2a and this note; not yet the eight review fixes |
+  | `opencode/development` | The eight M2a review fixes, ready to review and merge into `main` |
   | `milestone/m2a-dat-reader` | The M2a work, merged into `main` by fast-forward (`b230803`) |
   | `milestone/m1-bootable` | The M1 work, merged into `main` (`ad11969`) |
   | `docs/step1-spec` | The step 1 design spec, merged into `main` (`a8c75f6`) |
@@ -45,20 +48,31 @@ tree: the work below was requested and then paused before it started.
 - **Development resumes only on the owner's explicit command.**
 - `CLAUDE.md` holds these rules for every Claude session, and `.claude/settings.json` turns off the co-author line.
 
-## Unfinished work
+## Work status
 
-### 1. Eight minor findings from the M2a final review (not started)
+### 1. Eight minor findings from the M2a final review (done on `opencode/development`)
 
-| # | Finding | Suggested fix, with its regression test |
-|---|---|---|
-| 1 | `crates/pinewatch-dat/tests/install.rs` walks only `Bundles/` and `Localization/`. The game also parses `Maps/*/English.dat` with a reused `DatParser` (`LevelInfo.getLocalization` through `ReadWrite.ReadDataWithoutHash`). | Add the map files (and any `Maps/*/Bundles/`) to the walk, and assert that map files were found. |
-| 2 | V17 can be narrowed. In the shipped IL, `OrdinalIgnoreCase` equality and hashing both fold each `char` through `TextInfo.ToUpper`, so only the table data (V3) is open. | Re-check with the IL dump, then update V17 in `docs/VERIFICATION.md`. |
-| 3 | V18 can be settled: an unstable sort only reorders members with equal values, and those give the same bits. The "stable up to 16 members" wording is also wrong (the three-element case reorders `[1, 1, 0]`). | Move V18 to "Settled", fix the comment on `ordered_members` in `crates/pinewatch-mono/src/enums.rs`, and add a test with equal-valued names out of order. |
-| 4 | `crates/pinewatch-mono/tests/floats.rs` has no independently computed expected bits. | Pin corert quirks, for example `"-1.79769313486231571982965e-323"` → `0x8000000000000003` and `"2.4703282292062328e-324"` → `0x0000000000000001`, plus more cases from an independent model of corert's algorithm. |
-| 5 | The comment on `compare_with_and_without_comments` in `crates/pinewatch-dat/tests/tokenizer.rs` says the C# file has CRLF line ends. The SDK blob is LF; the CRLF comes from `core.autocrlf` in this checkout. | Fix the comment and run the case with both LF and CRLF. |
-| 6 | The README's status line claims more than the reference harness has confirmed. V19 could note that `Type.GetType` still throws some exceptions with `throwOnError: false` (for example `FileLoadException` for an assembly-qualified name). | Reword the status line; update V19, and consider letting `TypeResolver::resolve` return a `Result`, with a test that its error propagates through `parse_type`. |
-| 7 | Nothing checks the message format strings against the shipped `UnturnedDat.dll` the way `shipped_mscorlib` checks `mscorlib.dll`. | Add an install test that finds each format string the port uses among the DLL's string literals, and `Data.cs`'s "Duplicate key" text in `Assembly-CSharp.dll`. |
-| 8 | Six clippy warnings in M1 code: `crates/pinewatch-io/src/install.rs:122,133` and `crates/pinewatch/src/app.rs:79,80,137` (collapsible `if`), and `crates/pinewatch-mono/tests/net_string.rs:21` (comparison to an empty slice). | Collapse the `if`s. In `net_string.rs` the comparison tests `PartialEq<&str>` with `""` on purpose, so allow the lint there. |
+Implemented on 2026-11-03, with a regression test for each code change:
+
+- The install walk now includes `Maps/*/English.dat` and `Maps/*/Bundles/`, skips the binary `Level.dat`, and asserts
+  that map files were found.
+- V17 now records what the shipped IL shows: equality and hashing both fold each `char` through
+  `TextInfo.ToUpper`; only Mono's Unicode table data (V3) is open.
+- V18 is settled. `Array.Sort` is not stable even for a few members, but it can only reorder members with equal
+  values, which contribute the same bits. The `ordered_members` comment is fixed, and an equal-valued out-of-order
+  test covers it.
+- `floats.rs` now pins independently computed corert bits, taken from Unity 2022.3.62f3's Mono runtime, including
+  the `-1.79769313486231571982965e-323` -> `0x8000000000000003` and `2.4703282292062328e-324` ->
+  `0x0000000000000001` quirks, and the overflow at `1.7976931348623159e308`.
+- The tokenizer comment now says the SDK blob is LF and this checkout's CRLF comes from `core.autocrlf`; the case
+  runs with both line endings.
+- The README status no longer claims more than the harness confirmed. V19 records that `Type.GetType` can still
+  throw with `throwOnError: false` (for example `FileLoadException`). `TypeResolver::resolve` returns
+  `Result<Option<TypeHandle>, MonoException>`, `ExceptionKind::FileLoad` exists, and a test checks that the error
+  propagates through `parse_type`.
+- An install test finds the port's message format strings among the `UnturnedDat.dll` literals and `Data.cs`'s
+  duplicate-key text in `Assembly-CSharp.dll`.
+- The clippy warnings are fixed; `net_string.rs` allows the intentional empty-slice comparison lint.
 
 ### 2. M2b, the reference harness (not started; no plan written yet)
 
@@ -80,8 +94,9 @@ remaining differences.
     executes, so it is a candidate for the class-library checks (V3, V17, V20), read-only. Not decided.
 - **What each gap needs:**
   - V3 (Unicode tables): `IsWhiteSpace`, `ToUpperInvariant` and `ToLowerInvariant` for all 65,536 code units.
-  - V17 (key case folding): the same tables, plus `OrdinalIgnoreCase` equality and hashing on key pairs.
-  - V19 (type names): which names `Type.GetType(name, false, true)` resolves when called from `UnturnedDat.dll`.
+  - V17 (key case folding): only the same Unicode case tables (V3); the comparer algorithm is settled.
+  - V19 (type names): which names `Type.GetType(name, false, true)` resolves when called from `UnturnedDat.dll`,
+    and which exceptions it throws with `throwOnError: false`.
   - V20 (legacy `readBoolean`): `InvariantCultureIgnoreCase` results for `y` and `true` with inserted or replaced
     characters, including ignorable ones such as U+00AD.
 - **This work needs the Windows PC**, where the game install and Unity are.
@@ -101,9 +116,9 @@ on this repository while the PC is off. `CLAUDE.md` carries his rules into those
 
 ## Exact next steps, when the owner gives the command
 
-1. **The eight minor findings.** Branch `maintenance/m2a-minors` from `main`. Fix each finding with its regression
-   test, run `cargo test --workspace`, `cargo clippy --workspace --all-targets` and `cargo xtask check-deps` on the
-   Windows PC, fast-forward `main`, and push `main` and the branch.
+1. **Review and merge the eight minor findings.** `opencode/development` is pushed and green: 400 tests,
+   `cargo clippy --workspace --all-targets` and `cargo xtask check-deps` pass on the Windows PC. Review it, then
+   fast-forward `main` and push `main` when the owner asks.
 2. **M2b.** Write the spec and the plan (`docs/superpowers/plans/<date>-m2b-reference-harness.md`) from the scope
    above, choosing between the Unity Editor in batch mode and the game's own Mono runtime for each check. Then
    implement it on the Windows PC with tests first, run the comparisons, and update `docs/VERIFICATION.md` and

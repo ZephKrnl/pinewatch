@@ -5,7 +5,7 @@
 
 use std::sync::OnceLock;
 
-use pinewatch_mono::{Guid, NetEnum, NumberFormat, NumberStyles};
+use pinewatch_mono::{Guid, MonoException, NetEnum, NumberFormat, NumberStyles};
 
 use crate::tree::ValueRef;
 use crate::types::{INVALID_TYPE_CHARS, TypeHandle, TypeResolver};
@@ -97,14 +97,18 @@ impl ValueRef<'_> {
     }
 
     /// `ParseType(defaultValue)`: `default` for a null or empty value or a name containing `\`, `:` or `/`;
-    /// otherwise the type the resolver finds, or `default`.
-    pub fn parse_type(&self, resolver: &dyn TypeResolver, default: Option<TypeHandle>) -> Option<TypeHandle> {
+    /// otherwise the type the resolver finds, or `default`. An error from `Type.GetType` propagates.
+    pub fn parse_type(
+        &self,
+        resolver: &dyn TypeResolver,
+        default: Option<TypeHandle>,
+    ) -> Result<Option<TypeHandle>, MonoException> {
         let Some(value) = self.value().filter(|value| !value.is_empty()) else {
-            return default;
+            return Ok(default);
         };
         if value.as_units().iter().any(|unit| INVALID_TYPE_CHARS.contains(unit)) {
-            return default;
+            return Ok(default);
         }
-        resolver.resolve(value).or(default)
+        resolver.resolve(value).map(|found| found.or(default))
     }
 }

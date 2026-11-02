@@ -6,7 +6,7 @@ mod common;
 
 use common::{DatTestEnum, found, get_value, parse, tree_with_value};
 use pinewatch_dat::{DatTree, TypeHandle, TypeResolver, ValueRef};
-use pinewatch_mono::{Guid, NetString};
+use pinewatch_mono::{ExceptionKind, Guid, MonoException, NetString};
 
 /// `TryParseInt8`.
 const TRY_PARSE_INT8: &[(&str, bool, i8)] = &[
@@ -445,8 +445,8 @@ fn parse_guid() {
 struct TestResolver;
 
 impl TypeResolver for TestResolver {
-    fn resolve(&self, assembly_qualified_name: &NetString) -> Option<TypeHandle> {
-        handle(&assembly_qualified_name.to_string_lossy())
+    fn resolve(&self, assembly_qualified_name: &NetString) -> Result<Option<TypeHandle>, MonoException> {
+        Ok(handle(&assembly_qualified_name.to_string_lossy()))
     }
 }
 
@@ -468,7 +468,7 @@ fn parse_type() {
     for &(input, expected_value, default_value) in PARSE_TYPE {
         let tree = tree_with_value(input);
         let actual_value = value(&tree).parse_type(&TestResolver, type_handle(default_value));
-        assert_eq!(type_handle(expected_value), actual_value, "for {input:?}");
+        assert_eq!(Ok(type_handle(expected_value)), actual_value, "for {input:?}");
     }
 }
 
@@ -478,20 +478,37 @@ fn parse_type() {
 fn parse_type_rejects_invalid_names() {
     struct Anything;
     impl TypeResolver for Anything {
-        fn resolve(&self, _: &NetString) -> Option<TypeHandle> {
-            Some(TypeHandle(7))
+        fn resolve(&self, _: &NetString) -> Result<Option<TypeHandle>, MonoException> {
+            Ok(Some(TypeHandle(7)))
         }
     }
 
     let fallback = Some(TypeHandle(1));
     for input in ["a\\b", "a:b", "a/b", ""] {
         let tree = tree_with_value(input);
-        assert_eq!(fallback, value(&tree).parse_type(&Anything, fallback), "for {input:?}");
+        assert_eq!(Ok(fallback), value(&tree).parse_type(&Anything, fallback), "for {input:?}");
     }
     let (_, tree) = parse("key");
-    assert_eq!(fallback, value(&tree).parse_type(&Anything, fallback), "for a flag");
+    assert_eq!(Ok(fallback), value(&tree).parse_type(&Anything, fallback), "for a flag");
     let tree = tree_with_value("a.b");
-    assert_eq!(Some(TypeHandle(7)), value(&tree).parse_type(&Anything, fallback));
+    assert_eq!(Ok(Some(TypeHandle(7))), value(&tree).parse_type(&Anything, fallback));
+}
+
+/// `Type.GetType` can throw even with `throwOnError: false`, and `ParseType` propagates that error.
+#[test]
+fn parse_type_propagates_get_type_errors() {
+    struct Failing;
+    impl TypeResolver for Failing {
+        fn resolve(&self, _: &NetString) -> Result<Option<TypeHandle>, MonoException> {
+            Err(MonoException::new(ExceptionKind::FileLoad, "Could not load file or assembly 'Some.Assembly'."))
+        }
+    }
+
+    let tree = tree_with_value("Some.Type, Some.Assembly");
+    assert_eq!(
+        Err(MonoException::new(ExceptionKind::FileLoad, "Could not load file or assembly 'Some.Assembly'.")),
+        value(&tree).parse_type(&Failing, None)
+    );
 }
 
 /// `TryParseBool` reads a single character itself: `y`, `t` or `1` is true and `n`, `f` or `0` is false, case

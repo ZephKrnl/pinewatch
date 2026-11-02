@@ -49,6 +49,31 @@ fn nan_has_the_bits_of_the_csharp_constants() {
 }
 
 #[test]
+fn corert_rounding_quirks() {
+    // Expected bits from Unity 2022.3.62f3's Mono runtime (`double.TryParse` with `NumberStyles.Any` and the
+    // invariant culture), the class library the game runs. These cases differ from a correctly rounded conversion
+    // because corert keeps 18 significant digits and rounds once.
+    for (text, bits) in [
+        ("-1.79769313486231571982965e-323", 0x8000_0000_0000_0003),
+        ("2.4703282292062328e-324", 0x0000_0000_0000_0001),
+        ("2.4703282292062327e-324", 0x0000_0000_0000_0001),
+        ("1.2345678901234567890123456789e-320", 0x0000_0000_0000_09C2),
+        ("1.7976931348623157e308", 0x7FEF_FFFF_FFFF_FFFF),
+        ("1.7976931348623158e308", 0x7FEF_FFFF_FFFF_FFFF),
+        ("2.2250738585072014e-308", 0x0010_0000_0000_0000),
+        ("2.2250738585072011e-308", 0x000F_FFFF_FFFF_FFFF),
+        ("4.9406564584124654e-324", 0x0000_0000_0000_0001),
+        ("-4.9406564584124654e-324", 0x8000_0000_0000_0001),
+        ("1e-323", 0x0000_0000_0000_0002),
+        ("3e-324", 0x0000_0000_0000_0001),
+        ("5e-324", 0x0000_0000_0000_0001),
+    ] {
+        assert_eq!(f64_any(text).map(f64::to_bits), Some(bits), "{text}");
+    }
+    assert_eq!(f64_any("1.7976931348623159e308"), None);
+}
+
+#[test]
 fn single_is_the_cast_of_double() {
     let inputs = [
         "0.1",

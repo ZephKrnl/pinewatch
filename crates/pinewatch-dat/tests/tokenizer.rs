@@ -131,10 +131,11 @@ fn tokenize_list() {
 }
 
 /// Test that enabling/disabling comment tokenization doesn't affect non-comment tokens. The C# input is a verbatim
-/// string in a file with CRLF line ends and tab indents.
+/// string whose SDK blob uses LF line ends; the CRLF in this checkout comes from `core.autocrlf`. The test runs the
+/// same input with both line endings.
 #[test]
 fn compare_with_and_without_comments() {
-    let input = concat!(
+    let crlf_input = concat!(
         "// A comment\r\n",
         "// Another comment\r\n",
         "Key1 \"Value1\" // Inline comment\r\n",
@@ -221,11 +222,13 @@ fn compare_with_and_without_comments() {
         token(T::Value, "// With mis-configured comment"),
     ];
 
-    test_tokenizer(input, &expected_tokens, true);
-
     let without_comments: Vec<DatToken> =
         expected_tokens.iter().filter(|token| token.token_type != T::Comment).cloned().collect();
-    test_tokenizer(input, &without_comments, false);
+    let lf_input = crlf_input.replace("\r\n", "\n");
+    for input in [crlf_input, lf_input.as_str()] {
+        test_tokenizer(input, &expected_tokens, true);
+        test_tokenizer(input, &without_comments, false);
+    }
 }
 
 /// `SkipUtf8Bom` compares characters, not bytes, and reads each one before comparing the next, so any prefix of

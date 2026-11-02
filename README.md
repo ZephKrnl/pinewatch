@@ -26,8 +26,9 @@ and the .NET Framework reference source). Their license notices are in `NOTICES-
 ## Status
 
 Early development, milestone M2a: Pinewatch boots, finds your Unturned installation and renders a map's terrain
-from its landscape tiles. It also reads every `.dat` and `.asset` file the way the game's `DatParser` does, with the
-game's value helpers and Mono's number, bool, GUID and enum parsing. Terrain colors are temporary placeholders
+from its landscape tiles. It also has a port of the game's `.dat` reader and value helpers, with Mono's number, bool,
+GUID and enum parsing; behavior is ported from the C# and the shipped IL, and what still needs the reference harness
+is listed in `docs/VERIFICATION.md`. Terrain colors are temporary placeholders
 until later M2 steps bring the original materials. See `docs/ARCHITECTURE.md` for the milestones.
 
 ## Requirements

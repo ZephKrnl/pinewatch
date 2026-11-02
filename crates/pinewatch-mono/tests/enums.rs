@@ -43,3 +43,14 @@ fn unsorted_values_are_looked_up_in_value_order() {
     assert_eq!(parse("b", true), Some(1));
     assert_eq!(parse("b", false), Some(5));
 }
+
+#[test]
+fn equal_valued_members_are_interchangeable() {
+    // `Array.Sort` may reorder members with equal values. They contribute the same bits, so the result doesn't
+    // depend on which equal-valued name the lookup finds first (`VERIFICATION.md`, V18).
+    let info = EnumInfo { underlying: EnumUnderlying::I32, names: &["b", "B", "a"], values: &[1, 1, 0] };
+    let parse = |s: &str| try_parse_enum(&info, Some(&NetString::from_str(s)), true);
+    assert_eq!(parse("b"), Some(1));
+    assert_eq!(parse("B"), Some(1));
+    assert_eq!(parse("a"), Some(0));
+}

@@ -15,6 +15,7 @@ fn lone_surrogate_survives_round_trip() {
 }
 
 #[test]
+#[allow(clippy::comparison_to_empty)]
 fn compares_exactly_with_str() {
     assert!(NetString::from_str("Coord") == "Coord");
     assert!(NetString::from_str("Coord") != "coord");
