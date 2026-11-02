@@ -48,6 +48,12 @@ impl Guid {
         out
     }
 
+    /// `ToString()` and `ToString("D")`: 32 lowercase hexadecimal digits in groups of 8, 4, 4, 4 and 12.
+    pub fn to_string_d(&self) -> String {
+        let n = self.to_string_n();
+        format!("{}-{}-{}-{}-{}", &n[0..8], &n[8..12], &n[12..16], &n[16..20], &n[20..32])
+    }
+
     /// `new Guid(string g)` for a non-null `g`.
     pub fn parse(g: &NetString) -> Result<Guid, MonoException> {
         try_parse_guid(g.as_units())
@@ -58,6 +64,13 @@ impl Guid {
     /// exactly when `new Guid(input)` does, with the same value. A missing string fails.
     pub fn try_parse(input: Option<&NetString>) -> Option<Guid> {
         try_parse_guid(input?.as_units()).ok()
+    }
+}
+
+impl std::fmt::Display for Guid {
+    /// `Guid.ToString()`, the `D` format.
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.to_string_d())
     }
 }
 

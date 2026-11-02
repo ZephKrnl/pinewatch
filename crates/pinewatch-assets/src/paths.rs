@@ -41,7 +41,8 @@ impl MonoPath {
     /// `Path.GetDirectoryName(full)` for a file the searcher found. Only a root has none; the C# would then fail in
     /// its next `Path.Combine` with `ArgumentNullException`, which is the error here.
     pub(crate) fn parent(&self) -> Result<Self, MonoException> {
-        let full = mono_path::get_directory_name(STYLE, &self.full)?.ok_or_else(|| MonoException::argument_null("path1"))?;
+        let full =
+            mono_path::get_directory_name(STYLE, &self.full)?.ok_or_else(|| MonoException::argument_null("path1"))?;
         let rel = self.rel.rsplit_once('/').map_or(String::new(), |(parent, _)| parent.to_string());
         Ok(Self { full, rel })
     }
@@ -93,7 +94,8 @@ pub(crate) fn asset_files(install: &InstallRoot, dir: &MonoPath) -> Result<Vec<M
 /// a missing folder; other failures keep Rust's text for now (V12).
 fn enumeration_exception(dir: &MonoPath, error: &io::Error) -> MonoException {
     if error.kind() == io::ErrorKind::NotFound {
-        let full = mono_path::get_full_path(STYLE, &dir.full, &current_directory()).unwrap_or_else(|_| dir.full.clone());
+        let full =
+            mono_path::get_full_path(STYLE, &dir.full, &current_directory()).unwrap_or_else(|_| dir.full.clone());
         let root = mono_path::trim_ending_directory_separator(STYLE, &full);
         MonoException::new(ExceptionKind::DirectoryNotFound, sr::IO_PATH_NOT_FOUND_PATH.replace("{0}", &root))
     } else {

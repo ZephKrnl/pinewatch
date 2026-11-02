@@ -164,6 +164,14 @@ isn't set up. Each entry says what the Rust code does, where the behavior came f
   SDG.Framework.Foliage.FoliageInfoAsset' not found.` (from Mono's `RuntimeType.CreateInstanceSlow` and corefx's
   `MissingMethodException.Message`). **Check:** the abstract-class message in the shipped runtime, and the core
   bundle wait with a test install.
+- **V28. Asset classes' own `PopulateAsset` (gap).** The index is ported exactly (`AddToMapping`'s rules, messages
+  and `Dictionary` order), and so is what it reads from each asset: the friendly name of the 10 classes that
+  override `FriendlyName`, `ItemAsset.isPro`, and all of `RedirectorAsset`'s `PopulateAsset`. The other classes'
+  `PopulateAsset` isn't ported yet, so their own `ReportError` messages are missing, and an asset whose
+  `PopulateAsset` throws in the game (`Caught exception while populating ...`, not indexed) is indexed here.
+  `VendorAsset` names with `<` tags skip `ItemTool.filterRarityRichText` and `RichTextUtil.replaceColorTags` (a
+  regular expression), and `ServerListCurationAsset` uses its name, as when it has no curation file. **Fix:** port
+  each class's `PopulateAsset` with the step that first needs it.
 
 ## `pinewatch-kvt`
 

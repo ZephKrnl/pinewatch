@@ -130,19 +130,19 @@ fn header_errors_in_order() {
 
 #[test]
 fn parser_errors_come_first_and_mark_the_asset() {
-    let contents = format!("GUID {GUID}\nType Gun\n}}");
+    let contents = format!("GUID {GUID}\nType Gun\nID 1\n}}");
     let (_dir, install, loader, log) = load(&[("Bundles/X/X.dat", &contents)]);
     let path = full(&install, "Bundles/X/X.dat");
-    assert_eq!(warnings(&log), [format!("Error parsing \"{path}\": \"unexpected end of dictionary/object '}}' on line 3\"")]);
+    assert_eq!(warnings(&log), [format!("Error parsing \"{path}\": \"unexpected end of dictionary/object '}}' on line 4\"")]);
     assert!(loader.headers[0].has_errors);
 }
 
 #[test]
 fn master_bundle_override_and_exclusion() {
     let (_dir, install, loader, log) = load(&[
-        ("Bundles/A/A.dat", &format!("GUID {GUID}\nType Gun\nMaster_Bundle_Override missing.masterbundle")),
-        ("Bundles/B/B.dat", "GUID 3b2a3d4c5e6f708192a3b4c5d6e7f809\nType Gun\nExclude_From_Master_Bundle"),
-        ("Bundles/C/C.dat", "GUID 4b2a3d4c5e6f708192a3b4c5d6e7f809\nType Gun\nMaster_Bundle_Override CORE.MASTERBUNDLE"),
+        ("Bundles/A/A.dat", &format!("GUID {GUID}\nType Gun\nID 1\nMaster_Bundle_Override missing.masterbundle")),
+        ("Bundles/B/B.dat", "GUID 3b2a3d4c5e6f708192a3b4c5d6e7f809\nType Gun\nID 2\nExclude_From_Master_Bundle"),
+        ("Bundles/C/C.dat", "GUID 4b2a3d4c5e6f708192a3b4c5d6e7f809\nType Gun\nID 3\nMaster_Bundle_Override CORE.MASTERBUNDLE"),
     ]);
     let path = full(&install, "Bundles/A/A.dat");
     assert_eq!(warnings(&log), [format!("Unable to find master bundle override 'missing.masterbundle' for '{path}'")]);
@@ -151,15 +151,15 @@ fn master_bundle_override_and_exclusion() {
     assert_eq!(by_name("B").master_bundle, None);
     assert_eq!(by_name("C").master_bundle, loader.core_master_bundle());
     // Outside a master bundle the hash is the file's alone.
-    let contents = format!("GUID {GUID}\nType Gun\nMaster_Bundle_Override missing.masterbundle");
+    let contents = format!("GUID {GUID}\nType Gun\nID 1\nMaster_Bundle_Override missing.masterbundle");
     assert_eq!(by_name("A").hash, sha1(contents.as_bytes()));
 }
 
 #[test]
 fn individual_asset_bundle_versions() {
     let (_dir, _install, loader, log) = load(&[
-        ("Bundles/Low/Low.dat", &format!("GUID {GUID}\nType Gun\nAsset_Bundle_Version 0\nExclude_From_Master_Bundle")),
-        ("Bundles/High/High.dat", "GUID 5b2a3d4c5e6f708192a3b4c5d6e7f809\nType Gun\nAsset_Bundle_Version 9"),
+        ("Bundles/Low/Low.dat", &format!("GUID {GUID}\nType Gun\nID 1\nAsset_Bundle_Version 0\nExclude_From_Master_Bundle")),
+        ("Bundles/High/High.dat", "GUID 5b2a3d4c5e6f708192a3b4c5d6e7f809\nType Gun\nID 2\nAsset_Bundle_Version 9"),
     ]);
     let mut found = warnings(&log);
     found.sort();

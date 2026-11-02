@@ -4,7 +4,7 @@
 mod table;
 
 use pinewatch_dat::{TypeHandle, TypeResolver};
-use pinewatch_mono::{MonoException, NetString};
+use pinewatch_mono::{EnumInfo, EnumUnderlying, MonoException, NetEnum, NetString};
 
 /// `EAssetType`, the category that decides an asset's legacy ID table.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -22,6 +22,89 @@ pub enum EAssetType {
     Npc,
 }
 
+impl EAssetType {
+    const ALL: [EAssetType; 11] = [
+        Self::None,
+        Self::Item,
+        Self::Effect,
+        Self::Object,
+        Self::Resource,
+        Self::Vehicle,
+        Self::Animal,
+        Self::Mythic,
+        Self::Skin,
+        Self::Spawn,
+        Self::Npc,
+    ];
+
+    /// The enum's value.
+    pub fn bits(self) -> i32 {
+        Self::ALL.iter().position(|&category| category == self).unwrap_or(0) as i32
+    }
+
+    /// The member with this value, if one has it.
+    pub fn from_bits(bits: i32) -> Option<EAssetType> {
+        usize::try_from(bits).ok().and_then(|index| Self::ALL.get(index).copied())
+    }
+}
+
+/// An `EAssetType` value as C# holds it, which may be one no member has (`AssetCategory 42` parses).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct AssetCategory(pub i32);
+
+impl AssetCategory {
+    pub fn known(self) -> Option<EAssetType> {
+        EAssetType::from_bits(self.0)
+    }
+}
+
+impl From<EAssetType> for AssetCategory {
+    fn from(category: EAssetType) -> Self {
+        Self(category.bits())
+    }
+}
+
+impl std::fmt::Display for AssetCategory {
+    /// `Enum.ToString()`: the member's name, or the number for a value no member has.
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.known() {
+            Some(category) => f.write_str(Self::INFO.names[category.bits() as usize]),
+            None => write!(f, "{}", self.0),
+        }
+    }
+}
+
+impl NetEnum for AssetCategory {
+    const INFO: EnumInfo = EnumInfo {
+        underlying: EnumUnderlying::I32,
+        names: &["NONE", "ITEM", "EFFECT", "OBJECT", "RESOURCE", "VEHICLE", "ANIMAL", "MYTHIC", "SKIN", "SPAWN", "NPC"],
+        values: &[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+    };
+
+    fn from_bits(bits: u64) -> Self {
+        Self(bits as i32)
+    }
+}
+
+/// Which `FriendlyName` an asset class has: `Asset`'s (its name) or the override of the nearest class that has one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum FriendlyName {
+    /// `Asset.FriendlyName`: the name.
+    Base,
+    /// The localized `Name` (`AnimalAsset`, `ObjectAsset`, `ResourceAsset`, `RoadAsset`, `VehicleAsset`).
+    Localized,
+    /// `ItemAsset`: `FormatOrEmpty("Name")`, or the name when that is empty.
+    ItemName,
+    /// `LandscapeMaterialAsset`: the name without `_Material`, underscores as spaces.
+    LandscapeMaterial,
+    /// `TagAsset`: the localized `Name` if the translation has one, else the name.
+    Tag,
+    /// `VendorAsset`: the localized `Name` through `ItemTool.filterRarityRichText` and `RichTextUtil.replaceColorTags`.
+    Vendor,
+    /// `ServerListCurationAsset`: the curation file's name, or the name.
+    ServerListCuration,
+}
+
 /// One class's facts, as the SDK declares them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct AssetTypeInfo {
@@ -32,6 +115,7 @@ pub(crate) struct AssetTypeInfo {
     is_abstract: bool,
     /// Derives from `ItemAsset` (or is it), which changes `GetTypeFriendlyName`.
     is_item: bool,
+    friendly: FriendlyName,
 }
 
 /// A class deriving from `Asset`.
@@ -66,6 +150,15 @@ impl AssetType {
     /// `assetCategory`. `RedirectorAsset` returns the category its data names; this is its default, `NONE`.
     pub fn category(self) -> EAssetType {
         self.info().category
+    }
+
+    /// Derives from `ItemAsset` (or is it).
+    pub fn is_item(self) -> bool {
+        self.info().is_item
+    }
+
+    pub(crate) fn friendly_name_rule(self) -> FriendlyName {
+        self.info().friendly
     }
 
     /// Abstract classes can't be created (`Activator.CreateInstance` throws).

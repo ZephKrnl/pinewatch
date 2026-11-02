@@ -24,6 +24,8 @@ pub enum ExceptionKind {
     Format,
     IndexOutOfRange,
     InvalidCast,
+    /// `System.Collections.Generic.KeyNotFoundException`.
+    KeyNotFound,
     /// `System.MissingMethodException`.
     MissingMethod,
     Io,
@@ -45,6 +47,7 @@ impl ExceptionKind {
             Self::Format => "System.FormatException",
             Self::IndexOutOfRange => "System.IndexOutOfRangeException",
             Self::InvalidCast => "System.InvalidCastException",
+            Self::KeyNotFound => "System.Collections.Generic.KeyNotFoundException",
             Self::MissingMethod => "System.MissingMethodException",
             Self::Io => "System.IO.IOException",
             Self::NullReference => "System.NullReferenceException",

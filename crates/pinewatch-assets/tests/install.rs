@@ -1,6 +1,6 @@
-//! The whole install through what M2c has so far: every client search location searched and read, and every
-//! definition loaded up to its header. Asserts the core master bundle and plenty of headers, and prints the
-//! messages. The install is only read. Skipped without an install.
+//! The whole install through what M2c has so far: every client search location searched and read, every
+//! definition loaded and indexed. Asserts the core master bundle, plenty of assets in the index and the item with
+//! legacy ID 1 (the Eaglefire), and prints the messages. The install is only read. Skipped without an install.
 
 use pinewatch_assets::{AssetLoader, Origins, client_search_locations, read_location};
 use pinewatch_io::{LogLevel, MemoryLog, find_install};
@@ -28,13 +28,18 @@ fn every_search_location_reads_and_loads() {
     assert_eq!(loader.pending(), 0);
     assert!(loader.headers.len() >= 5000, "only {} asset headers", loader.headers.len());
 
+    let mapping = loader.mapping();
+    assert!(mapping.asset_list().len() >= 5000, "only {} assets in the index", mapping.asset_list().len());
+    assert!(mapping.find_legacy(pinewatch_assets::EAssetType::Item, 1).is_some(), "no item with legacy ID 1");
+
     let warnings = log.entries.iter().filter(|(level, _)| *level == LogLevel::Warn).count();
     let errors = log.entries.iter().filter(|(level, _)| *level == LogLevel::Error).count();
     eprintln!(
-        "{} locations, {} master bundles, {} headers, {warnings} warnings, {errors} errors",
+        "{} locations, {} master bundles, {} assets ({} indexed), {warnings} warnings, {errors} errors",
         locations.len(),
         loader.master_bundles.len(),
-        loader.headers.len()
+        loader.headers.len(),
+        mapping.asset_list().len()
     );
     for (level, text) in log.entries.iter().filter(|(level, _)| *level != LogLevel::Info).take(20) {
         eprintln!("  [{level}] {text}");

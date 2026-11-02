@@ -63,7 +63,8 @@ impl MasterBundleConfig {
                  exported from Unity.",
             ));
         }
-        let asset_bundle_name_without_extension = mono_path::get_file_name_without_extension(STYLE, &asset_bundle_name)?;
+        let asset_bundle_name_without_extension =
+            mono_path::get_file_name_without_extension(STYLE, &asset_bundle_name)?;
         let asset_prefix = get_string(data, "Asset_Prefix").unwrap_or_default();
         if asset_prefix.is_empty() {
             return Err(exception(

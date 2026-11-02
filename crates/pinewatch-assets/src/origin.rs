@@ -40,7 +40,8 @@ impl Origins {
     /// `Application.isEditor`, false in the game.
     pub fn new() -> Self {
         let core = AssetOrigin::new("Vanilla Built-in Assets");
-        let reload = AssetOrigin { should_assets_override_existing_ids: true, ..AssetOrigin::new("Reloaded Assets (Debug)") };
+        let reload =
+            AssetOrigin { should_assets_override_existing_ids: true, ..AssetOrigin::new("Reloaded Assets (Debug)") };
         let shared = AssetOrigin::new("Server Common (Legacy)");
         let per_server = AssetOrigin::new("Per-Server (Legacy)");
         Self { list: vec![core, reload, shared, per_server] }

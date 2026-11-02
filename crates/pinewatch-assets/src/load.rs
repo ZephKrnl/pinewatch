@@ -15,10 +15,12 @@ use sha1::{Digest, Sha1};
 
 use crate::local::Local;
 use crate::master_bundle::{MasterBundleConfig, asset_bundle_version};
+use crate::mapping::AssetMapping;
 use crate::origin::{OriginId, Origins};
+use crate::populate::populate;
 use crate::paths::{MonoPath, STYLE};
 use crate::reader::{AssetDefinition, ResultItem};
-use crate::types::{AssetType, AssetTypeResolver, legacy_asset_type};
+use crate::types::{AssetCategory, AssetType, AssetTypeResolver, EAssetType, legacy_asset_type};
 
 /// What `LoadFile` knows about an asset when it creates it: the asset's fields before its own `PopulateAsset`.
 #[derive(Debug)]
@@ -52,6 +54,16 @@ pub struct AssetHeader {
     pub uses_asset_dictionary: bool,
     /// The parsed definition and its translations, for the asset's own `PopulateAsset`.
     pub definition: AssetDefinition,
+    /// `FriendlyName`, once the asset's `PopulateAsset` has run.
+    pub friendly_name: String,
+    /// `assetCategory`; `RedirectorAsset` reads it from its data.
+    pub category: AssetCategory,
+    /// `ItemAsset.isPro`.
+    pub is_pro: bool,
+    /// `hasBeenReplaced`: an asset with the same ID or GUID replaced this one in the mapping.
+    pub has_been_replaced: bool,
+    /// `RedirectorAsset.TargetGuid`, for redirectors.
+    pub target_guid: Option<Guid>,
 }
 
 impl AssetHeader {
@@ -84,8 +96,14 @@ pub struct AssetLoader {
     pending: VecDeque<AssetDefinition>,
     /// `Assets.errors`: every `reportError` text.
     pub errors: Vec<String>,
-    /// The headers of the definitions `LoadFile` got as far as creating an asset for, in loading order.
+    /// The assets `LoadFile` created, in loading order.
     pub headers: Vec<AssetHeader>,
+    /// `defaultAssetMapping`.
+    default_mapping: AssetMapping,
+    /// `Assets.hasUnlinkedSpawns`.
+    has_unlinked_spawns: bool,
+    /// Each origin's `assets` list, as (origin, asset) in the order they were added.
+    origin_assets: Vec<(OriginId, usize)>,
 }
 
 impl AssetLoader {
@@ -97,7 +115,25 @@ impl AssetLoader {
             pending: VecDeque::new(),
             errors: Vec::new(),
             headers: Vec::new(),
+            default_mapping: AssetMapping::new(),
+            has_unlinked_spawns: false,
+            origin_assets: Vec::new(),
         }
+    }
+
+    /// `defaultAssetMapping`, which is also the current mapping outside a server.
+    pub fn mapping(&self) -> &AssetMapping {
+        &self.default_mapping
+    }
+
+    /// `Assets.hasUnlinkedSpawns`: a spawn asset was added since spawns were last linked.
+    pub fn has_unlinked_spawns(&self) -> bool {
+        self.has_unlinked_spawns
+    }
+
+    /// `origin.GetAssets()`: the assets added for this origin, in order.
+    pub fn origin_assets(&self, origin: OriginId) -> impl Iterator<Item = usize> + '_ {
+        self.origin_assets.iter().filter(move |(owner, _)| *owner == origin).map(|(_, index)| *index)
     }
 
     pub fn origins(&self) -> &Origins {
@@ -141,6 +177,105 @@ impl AssetLoader {
     fn report_error(&mut self, error: String, log: &mut dyn LogSink) {
         log.log(LogLevel::Warn, &error);
         self.errors.push(error);
+    }
+
+    /// `Assets.ReportError(asset, message)`: marks the asset and reports the message after its prefix,
+    /// `<origin> <friendly name> (<type>) [<guid:N>]`.
+    fn report_asset_error(&mut self, index: usize, message: &str, log: &mut dyn LogSink) {
+        let header = &mut self.headers[index];
+        header.has_errors = true;
+        let prefix = format!(
+            "{} {} ({}) [{}]",
+            self.origins.get(header.origin).name,
+            header.friendly_name,
+            header.asset_type.friendly_type_name(),
+            header.guid.to_string_n()
+        );
+        self.report_error(format!("{prefix}: {message}"), log);
+    }
+
+    /// `FriendlyNameWithFriendlyType` and `GetOriginName()` of an asset, as the index messages name it.
+    fn describe(&self, index: usize) -> (String, String) {
+        let header = &self.headers[index];
+        let name = format!("{} ({})", header.friendly_name, header.asset_type.friendly_type_name());
+        (name, self.origins.get(header.origin).name.clone())
+    }
+
+    /// `AddToMapping(asset, overrideExistingID, defaultAssetMapping)`. `Err` is an exception it throws (the legacy
+    /// table indexer's, for a category the mapping doesn't hold).
+    fn add_to_mapping(
+        &mut self,
+        index: usize,
+        override_existing_id: bool,
+        log: &mut dyn LogSink,
+    ) -> Result<(), MonoException> {
+        let category = self.headers[index].category;
+        if category == AssetCategory::from(EAssetType::Spawn) {
+            self.has_unlinked_spawns = true;
+        }
+        let id = self.headers[index].id;
+        if category == AssetCategory::from(EAssetType::Object) {
+            let table = self.default_mapping.table_mut(category)?;
+            if override_existing_id {
+                let replaced = table.remove(&id);
+                table.add(id, index)?;
+                if let Some(existing) = replaced {
+                    self.headers[existing].has_been_replaced = true;
+                }
+            } else if !table.contains_key(&id) {
+                table.add(id, index)?;
+            }
+        } else if category != AssetCategory::from(EAssetType::None) {
+            if id != 0 {
+                let table = self.default_mapping.table_mut(category)?;
+                if override_existing_id {
+                    if let Some(existing) = table.remove(&id) {
+                        self.headers[existing].has_been_replaced = true;
+                    }
+                } else if let Some(&other) = table.try_get_value(&id) {
+                    let (other_name, other_origin) = self.describe(other);
+                    let message = format!("legacy ID {id} already taken by {other_name} in {other_origin}!");
+                    self.report_asset_error(index, &message, log);
+                    return Ok(());
+                }
+                self.default_mapping.table_mut(category)?.add(id, index)?;
+            } else {
+                let needs_legacy_id = match category.known() {
+                    Some(EAssetType::Item) => !self.headers[index].is_pro,
+                    Some(EAssetType::Effect | EAssetType::Vehicle | EAssetType::Spawn | EAssetType::Npc) => false,
+                    _ => true,
+                };
+                if needs_legacy_id {
+                    self.report_asset_error(index, "needs a non-zero ID", log);
+                }
+            }
+        }
+
+        let guid = self.headers[index].guid;
+        if guid != Guid::EMPTY {
+            if override_existing_id {
+                if let Some(&existing) = self.default_mapping.asset_dictionary.try_get_value(&guid) {
+                    let existing_guid = self.headers[existing].guid;
+                    self.default_mapping.asset_dictionary.remove(&existing_guid);
+                    // `assetList.Remove(existingAsset)`: the first entry for that asset.
+                    let list = &mut self.default_mapping.asset_list;
+                    if let Some(position) = list.iter().position(|&entry| entry == existing) {
+                        list.remove(position);
+                    }
+                    self.headers[existing].has_been_replaced = true;
+                }
+            } else if let Some(&other) = self.default_mapping.asset_dictionary.try_get_value(&guid) {
+                let (other_name, other_origin) = self.describe(other);
+                self.report_asset_error(index, &format!("GUID already taken by {other_name} in {other_origin}!"), log);
+                return Ok(());
+            }
+            self.default_mapping.asset_dictionary.add(guid, index)?;
+            self.default_mapping.asset_list.push(index);
+        }
+
+        self.default_mapping.modification_counter += 1;
+        // The vehicle respawn check needs a loaded level, and workshop logging is off (`-LogWorkshopAssets`).
+        Ok(())
     }
 
     /// `TryLoadFile`.
@@ -200,7 +335,8 @@ impl AssetLoader {
             }
         }
 
-        let asset_directory = mono_path::get_directory_name(STYLE, &asset_path)?.ok_or_else(MonoException::null_reference)?;
+        let asset_directory =
+            mono_path::get_directory_name(STYLE, &asset_path)?.ok_or_else(MonoException::null_reference)?;
         let suffix: Vec<u16> = "Asset.dat".encode_utf16().collect();
         let ends_with_asset_dat = asset_path_units.len() >= suffix.len()
             && chars::equals_ordinal_ignore_case(&asset_path_units[asset_path_units.len() - suffix.len()..], &suffix);
@@ -255,7 +391,8 @@ impl AssetLoader {
                     None => match data.parse_type("Type", &AssetTypeResolver, None)?.and_then(AssetType::from_handle) {
                         Some(asset_type) => asset_type,
                         None => {
-                            self.report_error(format!("Unhandled asset type \"{legacy_type}\" in \"{asset_path}\""), log);
+                            let message = format!("Unhandled asset type \"{legacy_type}\" in \"{asset_path}\"");
+                            self.report_error(message, log);
                             return Ok(());
                         }
                     },
@@ -305,7 +442,8 @@ impl AssetLoader {
             bundle_name = asset_internal_name.clone();
             // `bundleRelativePath.ToLowerInvariant()` throws for a null path.
             let relative_text = relative.clone().ok_or_else(MonoException::null_reference)?;
-            let hashable_path = format!("{}/{}", to_lower_invariant(&relative_text), to_lower_invariant(&asset_internal_name));
+            let hashable_path =
+                format!("{}/{}", to_lower_invariant(&relative_text), to_lower_invariant(&asset_internal_name));
             let path_hash: [u8; 20] = Sha1::digest(hashable_path.as_bytes()).into();
             let mut both = data_hash.to_vec();
             both.extend_from_slice(&path_hash);
@@ -334,13 +472,17 @@ impl AssetLoader {
         let mut individual_version = data.parse_int32("Asset_Bundle_Version", asset_bundle_version::UNITY_5);
         if individual_version < asset_bundle_version::UNITY_5 {
             self.report_error(
-                format!("{asset_internal_name} Lowest individual asset bundle version is 1 (default), associated with 5.5."),
+                format!(
+                    "{asset_internal_name} Lowest individual asset bundle version is 1 (default), associated with 5.5."
+                ),
                 log,
             );
             individual_version = asset_bundle_version::UNITY_5;
         } else if individual_version > asset_bundle_version::NEWEST {
             self.report_error(
-                format!("{asset_internal_name} Highest individual asset bundle version is 6, associated with 2022 LTS."),
+                format!(
+                    "{asset_internal_name} Highest individual asset bundle version is 6, associated with 2022 LTS."
+                ),
                 log,
             );
             individual_version = asset_bundle_version::NEWEST;
@@ -371,7 +513,7 @@ impl AssetLoader {
         let ignore_texture_readable = data.contains_key("Ignore_TexRW");
         let has_errors = file.asset_errors.as_ref().is_some_and(|errors| !errors.is_empty());
         let origin = file.origin;
-        self.headers.push(AssetHeader {
+        let mut header = AssetHeader {
             path: file.path.clone(),
             internal_name: asset_internal_name,
             name: bundle_name,
@@ -391,7 +533,29 @@ impl AssetLoader {
             ignore_texture_readable,
             uses_asset_dictionary,
             definition: file,
-        });
+            friendly_name: String::new(),
+            category: AssetCategory::from(asset_type.category()),
+            is_pro: false,
+            has_been_replaced: false,
+            target_guid: None,
+        };
+
+        // `asset.PopulateAsset(…)`, then `asset.origin.assets.Add(asset)` and `AddToMapping`, all in one `try`.
+        let reports = populate(&mut header);
+        let index = self.headers.len();
+        self.headers.push(header);
+        for report in reports {
+            self.report_asset_error(index, &report, log);
+        }
+        self.origin_assets.push((origin, index));
+        let override_existing_ids = self.origins.get(origin).should_assets_override_existing_ids;
+        if let Err(exception) = self.add_to_mapping(index, override_existing_ids, log) {
+            self.report_error(
+                format!("Caught exception while populating \"{asset_path}\": {}", exception_message(&exception)),
+                log,
+            );
+            log_exception_only(log, &exception);
+        }
         Ok(())
     }
 }

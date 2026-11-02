@@ -21,6 +21,8 @@ pub const ARG_HEX_STYLE_NOT_SUPPORTED: &str =
 pub const ARG_INDEX_OUT_OF_RANGE_EXCEPTION: &str = "Index was outside the bounds of the array.";
 pub const ARG_INVALID_BASE: &str = "Invalid Base.";
 pub const ARG_INVALID_CAST_EXCEPTION: &str = "Specified cast is not valid.";
+/// `SR.Arg_KeyNotFoundWithKey`, from `Dictionary`'s indexer.
+pub const ARG_KEY_NOT_FOUND_WITH_KEY: &str = "The given key '{0}' was not present in the dictionary.";
 pub const ARG_INVALID_HEX_STYLE: &str = "With the AllowHexSpecifier bit set in the enum bit field, the only other valid bits that can be combined into the enum value must be a subset of those in HexNumber.";
 pub const ARG_NULL_REFERENCE_EXCEPTION: &str = "Object reference not set to an instance of an object.";
 pub const ARG_OVERFLOW_EXCEPTION: &str = "Arithmetic operation resulted in an overflow.";
@@ -72,6 +74,7 @@ pub const ALL: &[&str] = &[
     ARG_INDEX_OUT_OF_RANGE_EXCEPTION,
     ARG_INVALID_BASE,
     ARG_INVALID_CAST_EXCEPTION,
+    ARG_KEY_NOT_FOUND_WITH_KEY,
     ARG_INVALID_HEX_STYLE,
     ARG_NULL_REFERENCE_EXCEPTION,
     ARG_OVERFLOW_EXCEPTION,

@@ -131,7 +131,9 @@ fn read_level_info(install: &InstallRoot, dir: MonoPath, log: &mut dyn LogSink) 
             return Ok(None);
         }
         // `ReadWrite.readBlock` reads the whole file; reading a `Block` never throws.
-        install.read(&level_file.rel).map_err(|error| MonoException::new(pinewatch_mono::ExceptionKind::Io, error.to_string()))?;
+        install
+            .read(&level_file.rel)
+            .map_err(|error| MonoException::new(pinewatch_mono::ExceptionKind::Io, error.to_string()))?;
         let name = paths::folder_name(&dir.full)?;
         Ok(Some(LevelInfo { name, dir: dir.clone() }))
     };

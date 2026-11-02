@@ -181,3 +181,12 @@ fn x_format_structure_errors() {
     // A brace without "0x" right after it.
     assert_eq!(parse_err("{,0x0}"), format(sr::FORMAT_GUID_HEX_PREFIX));
 }
+
+/// `ToString()` is the `D` format: lowercase, dashes between the groups.
+#[test]
+fn to_string_d_format() {
+    let guid = pinewatch_mono::Guid::parse(&pinewatch_mono::NetString::from("1B2A3D4C5E6F708192A3B4C5D6E7F809")).unwrap();
+    assert_eq!(guid.to_string_d(), "1b2a3d4c-5e6f-7081-92a3-b4c5d6e7f809");
+    assert_eq!(guid.to_string(), "1b2a3d4c-5e6f-7081-92a3-b4c5d6e7f809");
+    assert_eq!(guid.to_string_n(), "1b2a3d4c5e6f708192a3b4c5d6e7f809");
+}

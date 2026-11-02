@@ -53,7 +53,12 @@ pub fn read_location(
 
 /// The reader for one location's events, in order, with one parser for all of them (metadata off, as
 /// `-ParseAssetMetadata` is by default).
-pub fn read_items(install: &InstallRoot, origin: OriginId, events: Vec<SearchEvent>, language: &str) -> Vec<ResultItem> {
+pub fn read_items(
+    install: &InstallRoot,
+    origin: OriginId,
+    events: Vec<SearchEvent>,
+    language: &str,
+) -> Vec<ResultItem> {
     let mut reader = Reader { install, parser: DatParser::new(), origin, language };
     reader.parser.set_enable_metadata(false);
     events
