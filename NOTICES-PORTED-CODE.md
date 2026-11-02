@@ -20,7 +20,7 @@ Ported from `mono/corefx` at `5b4edb9b0a721aed60c9c8ddeed441bdd7451e42` and `mon
 | `crates/pinewatch-mono/src/number_to_double.rs` | corert `src/System.Private.CoreLib/src/System/Number.CoreRT.cs` (`NumberToDouble`) |
 | `crates/pinewatch-mono/src/text.rs` | corefx `IO/StreamReader.cs`, `Text/UTF8Encoding.cs`, `Text/UnicodeEncoding.cs`, `Text/UTF32Encoding.cs` |
 | `crates/pinewatch-mono/src/exception.rs` | corefx `ArgumentException.cs` (`Message`) and the exception classes' default messages |
-| `crates/pinewatch-mono/src/chars.rs` | corefx `Char.cs` (`IsWhiteSpaceLatin1`) |
+| `crates/pinewatch-mono/src/chars.rs` | corefx `Char.cs` (`IsWhiteSpaceLatin1`), `Globalization/CharUnicodeInfo.cs` (`IsWhiteSpace`) and the separator code units of `Globalization/CharUnicodeInfoData.cs` |
 | `crates/pinewatch-mono/src/boolean.rs` | corefx `Boolean.cs` (`TryParse`, `TrimWhiteSpaceAndNull`) |
 | `crates/pinewatch-mono/src/sr.rs` | corefx resource strings, as Mono's `mcs/class/corlib/corefx/SR.cs` carries them |
 | `crates/pinewatch-unity/src/lib.rs` | corefx `src/Common/src/CoreLib/System/Single.cs` (`Equals(float)`) |
@@ -61,6 +61,7 @@ Ported from `mcs/class/referencesource` in Unity's Mono at `b8eb56fab45dd52845fa
 | `crates/pinewatch-mono/src/number.rs` | `NumberFormatInfo.ValidateParseStyleInteger` and `ValidateParseStyleFloatingPoint` in `mscorlib/system/globalization/numberformatinfo.cs` |
 | `crates/pinewatch-mono/src/sr.rs` | reference-source resource strings, as Mono's `mcs/class/corlib/ReferenceSources/SR.cs` carries them |
 | `crates/pinewatch-mono/src/enums.rs` | `Enum.TryParse` and `TryParseEnum` in `mscorlib/system/enum.cs` |
+| `crates/pinewatch-mono/src/chars.rs` | `TextInfo.ToUpper(char)`, `ToLower(char)` and their ASCII helpers in `mscorlib/system/globalization/textinfo.cs` |
 
 ```
 The MIT License (MIT)
@@ -84,6 +85,37 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+```
+
+## Mono class libraries
+
+Ported from `mcs/class/corlib` in Unity's Mono at `b8eb56fab45dd52845fabba7b7ddc9a80b2b0498`. The source file has no
+copyright line of its own; Mono's `LICENSE` puts the class libraries under the MIT license below.
+
+| Rust file | Ported from |
+|---|---|
+| `crates/pinewatch-mono/src/case_tables.rs` | `TextInfoToUpperData`, `TextInfoToLowerData`, `ToUpperInternal(char)` and `ToLowerInternal(char)` in `ReferenceSources/TextInfo.cs` |
+| `crates/pinewatch-mono/src/chars.rs` | the same `ToUpperInternal(char)` and `ToLowerInternal(char)` |
+
+```
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the
+"Software"), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish,
+distribute, sublicense, and/or sell copies of the Software, and to
+permit persons to whom the Software is furnished to do so, subject to
+the following conditions:
+
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
 ## Mono runtime behavior

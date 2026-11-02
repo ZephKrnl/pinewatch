@@ -19,3 +19,10 @@ fn bool_parsing() {
     }
     assert_eq!(try_parse_bool(None), None);
 }
+
+/// The ignore-case match folds through Mono's invariant table, which keeps `ſ` (U+017F) apart from `S` (V3).
+#[test]
+fn long_s_is_not_s() {
+    assert_eq!(parse("FALSE"), Some(false));
+    assert_eq!(parse("fal\u{17F}e"), None);
+}

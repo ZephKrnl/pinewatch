@@ -166,6 +166,21 @@ fn duplicate_key_with_other_case_keeps_first_spelling() {
     assert_eq!(pairs(tree.root()), expected);
 }
 
+/// `OrdinalIgnoreCase` folds every code unit through Mono's invariant `TextInfo.ToUpper` table (V3), which leaves
+/// `ſ` (U+017F) and `ı` (U+0131) as they are but maps `ᾀ` (U+1F80) to `ᾈ` (U+1F88). So `ſize` and `ıtem` are new
+/// keys, while `ᾈ` replaces the value of `ᾀ`.
+#[test]
+fn key_case_folding_follows_monos_table() {
+    let (parser, tree) = parse("Size 1\n\u{17F}ize 2\nItem 3\n\u{131}tem 4\n\u{1F80} 5\n\u{1F88} 6");
+    assert_eq!(
+        parser.error_messages(),
+        ["duplicate key \"\u{1F88}\" on line 6 replacing existing value \"5\" with \"6\""]
+    );
+    let expected = [("Size", "1"), ("\u{17F}ize", "2"), ("Item", "3"), ("\u{131}tem", "4"), ("\u{1F80}", "6")]
+        .map(|(key, value)| (NetString::from(key), Some(NetString::from(value))));
+    assert_eq!(pairs(tree.root()), expected);
+}
+
 /// The message describes the replaced and the new node: a quoted value, `value(null)` for a flag, or a list or
 /// dictionary with its item count.
 #[test]

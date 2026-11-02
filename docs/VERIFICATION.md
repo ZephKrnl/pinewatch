@@ -71,15 +71,25 @@ isn't set up. Each entry says what the Rust code does, where the behavior came f
   - A null dereference and a failed cast make the runtime create the exception with its default constructor
     (`mono_exception_from_name` in `exception.c`).
   - `Environment.NewLine` is `"\r\n"` on Windows.
-- **V3. Unicode tables (gap).** Above U+00FF, `IsWhiteSpace` uses Rust's `White_Space` property.
-  `ToLowerInvariant` and `ToUpperInvariant` use Rust's mappings when they give a single code unit. .NET's simple
-  mappings differ for a few characters, for example U+0130 lowercases to U+0069 in .NET but stays U+0130 here.
-  Mono may also use an older Unicode version. This affects GUID text (trimming, the hex-digit check, the `x` of a
-  hex prefix) and, since M2a, also: which characters end an unquoted `.dat` key or count as blank between tokens
-  (for example U+2028 or U+3000), `.dat` key matching (`OrdinalIgnoreCase`, V17), the trimming in
-  `Boolean.TryParse`, the trimming and ignore-case name match in `Enum.TryParse`, the trimming around the `float`
-  and `double` special symbols, and the legacy `readBoolean` (V20). **Fix:** dump Mono's tables for all 65,536 code
-  units with the harness.
+- **V3. Unicode tables.** Ported from source on 2026-11-02; before, Pinewatch used Rust's Unicode tables.
+  - `IsWhiteSpace` is corefx's `IsWhiteSpaceLatin1` up to U+00FF, then the space, line and paragraph separator
+    categories of corefx `CharUnicodeInfoData`: 17 code units, listed in `chars.rs`. Rust's `White_Space` property
+    gave the same set.
+  - `ToUpperInvariant` and `ToLowerInvariant` are `CultureInfo.InvariantCulture.TextInfo.ToUpper` and `ToLower`
+    (reference source `textinfo.cs`, `MONO` branch): ASCII directly, everything else from Mono's
+    `TextInfoToUpperData` and `TextInfoToLowerData` (`mcs/class/corlib/ReferenceSources/TextInfo.cs`). For the
+    invariant culture Mono skips its culture special cases, so `µ`, `ı`, `ſ`, `ǅ`, `ς`, `ẞ` and the ohm, Kelvin and
+    Ångström signs, among others, stay unchanged. Rust's mappings differed for 252 code units (upper case) and 207
+    (lower case). The tests in `crates/pinewatch-mono/tests/chars.rs` pin checksums of all 65,536 mappings, computed
+    from the C# source.
+  - These tables decide GUID text (trimming, the hex-digit check, the `x` of a hex prefix), which characters end an
+    unquoted `.dat` key or count as blank between tokens (for example U+2028 or U+3000), `.dat` key matching (V17),
+    the trimming and ignore-case match in `Boolean.TryParse`, the trimming and ignore-case name match in
+    `Enum.TryParse`, the trimming around the `float` and `double` special symbols, and the legacy `readBoolean`
+    (V20).
+
+  **Check:** that the shipped `mscorlib.dll` holds the same `TextInfoToUpperData`, `TextInfoToLowerData` and
+  `CharUnicodeInfoData` (Unity publishes no exact build commit, V0), or a harness dump of all 65,536 code units.
 - **V4. UTF-8 decoding.** Ported from corefx `UTF8Encoding.GetChars`, the slow loop, which the fast loop hands every
   irregular sequence to. Each fallback is one U+FFFD. These lead bytes are invalid on their own: `80`–`BF`, `C0`,
   `C1` and `F5`–`FF`. An interrupted sequence is one fallback, and the interrupting byte is read again. A bad
@@ -136,11 +146,21 @@ isn't set up. Each entry says what the Rust code does, where the behavior came f
 
 ## `pinewatch-dat`
 
-- **V17. Keys that differ only by case (gap).** `DatDictionary` uses `StringComparer.OrdinalIgnoreCase`. Pinewatch
-  treats two keys as equal when every code unit matches after `ToUpperInvariant`, and above ASCII that mapping comes
-  from Rust's Unicode tables, not Mono's (V3). Equal keys merge: the first spelling stays and the last value wins,
-  with a `duplicate key` error. **Check:** non-ASCII key pairs that differ only by case merge, or stay apart, exactly
-  as in the game. That depends on both `Equals` and `GetHashCode` of Mono's `OrdinalIgnoreCase` comparer.
+- **V17. Keys that differ only by case.** `DatDictionary` uses `StringComparer.OrdinalIgnoreCase`. In the source
+  (Unity mono `b8eb56f`, traced 2026-11-02):
+  - `OrdinalIgnoreCaseComparer.Equals` (corefx `StringComparer.cs`) is `string.Equals(x, y, OrdinalIgnoreCase)`
+    (`external/corefx-bugfix/.../String.Comparison.cs`): the lengths must match, then
+    `CompareInfo.CompareOrdinalIgnoreCase` folds `a`–`z` itself while both code units are ASCII and hands the rest
+    to Mono's `CompareStringOrdinalIgnoreCase` (`mcs/class/corlib/corefx/CompareInfo.cs`), which compares
+    `InvariantCulture.TextInfo.ToUpper` of each code unit. `GlobalizationMode.Invariant` is `false` in Mono.
+  - Its `GetHashCode` is `CompareInfo.GetIgnoreCaseHash`: `ToUpperInvariant` over the span (`TextInfo.ChangeCase`,
+    the same `ToUpper` for each code unit), then Marvin.
+
+  So two keys merge exactly when every code unit is equal after `ToUpperInvariant` (V3), which is what Pinewatch
+  does. Equal keys merge: the first spelling stays and the last value wins, with a `duplicate key` error.
+  **Check:** the same chain in the shipped IL (`OrdinalIgnoreCaseComparer`, `String.Equals(string, string,
+  StringComparison)`, `CompareInfo.CompareOrdinalIgnoreCase`, `CompareStringOrdinalIgnoreCase`, `GetIgnoreCaseHash`,
+  `MemoryExtensions.ToUpperInvariant`, `TextInfo.ChangeCase`, `TextInfo.ToUpper(char)`), and V3's tables.
 - **V19. Type names in `.dat` values (gap).** `ParseType` calls `Type.GetType(name, false, ignoreCase: true)`, which
   searches the calling assembly (`UnturnedDat.dll`) and `mscorlib.dll` unless the name says which assembly, and
   matches case-insensitively. Pinewatch asks a `TypeResolver`, and no resolver knows the game's types yet, as in V10.

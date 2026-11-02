@@ -5,6 +5,7 @@
 //! Behaviors that the Unity reference harness has not confirmed yet are listed in `docs/VERIFICATION.md`.
 
 mod boolean;
+mod case_tables;
 pub mod chars;
 mod enums;
 mod exception;
