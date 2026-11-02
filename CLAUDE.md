@@ -33,6 +33,7 @@ the work stands, what is unfinished, and the exact next steps.
     for 1:1 checks.
   - Building the `pinewatch` app crate (Bevy) on Linux needs `pkg-config` and the ALSA, udev, Wayland and xkbcommon
     development packages.
-  - `cargo test --workspace` has not been run on Linux yet.
+  - `cargo test --workspace` passes on Linux (first run 2026-11-02, see `docs/HANDOFF.md`). On a fresh machine,
+    install `clippy` and run `cargo fetch` first: `cargo xtask check-deps` runs `cargo tree --target all --offline`.
 - **After cloning,** run `git submodule update --init`. On Windows, turn on long paths first (see
   `docs/HANDOFF.md`).

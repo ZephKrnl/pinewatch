@@ -1,19 +1,28 @@
 # Handoff
 
-The state of Pinewatch on 2026-11-02, written so work can resume from this file alone. Nothing is half-done in the
-tree: the work below was requested and then paused before it started.
+The state of Pinewatch on 2026-11-02 (updated at the end of the first cloud session), written so work can resume
+from this file alone.
 
 ## Where things stand
 
-- **Current branch:** `main`. The working tree is clean.
+- **Current branch:** `main-9m65p0`, the branch the cloud session was given. It holds `main` plus the M2a review
+  fixes below, and is pushed. **`main` was not fast-forwarded**: the fixes still need the Windows run (see "Exact
+  next steps").
 - **Done:** M1 (the bootable terrain viewer) and M2a (the `.dat` reader) are merged into `main`. On the Windows PC,
-  with the game installed, `cargo test --workspace` passes all 396 tests and skips none.
+  with the game installed, `cargo test --workspace` passes all 396 tests on `main` and skips none.
+- **Linux (cloud session, 2026-11-02):** on `main-9m65p0`, `cargo test --workspace` passes 403 tests (the install
+  tests print `skipped: no Unturned install found`; the Windows-only test doesn't build), `cargo clippy --workspace
+  --all-targets` gives no warnings, and `cargo xtask check-deps` passes. Setup it needed: `apt-get install
+  libasound2-dev libudev-dev libwayland-dev libxkbcommon-dev` (pkg-config was present), `rustup component add
+  clippy`, and `cargo fetch`, because `check-deps` runs `cargo tree --target all --offline` and a fresh machine
+  lacks the Windows-only crates.
 - **Remote:** `origin` is the private GitHub repository `ZephKrnl/pinewatch`. It stays private.
 - **Branches** (all pushed to `origin`):
 
   | Branch | What it holds |
   |---|---|
-  | `main` | Everything: M1, M2a, the M2a review fixes and this note |
+  | `main` | M1, M2a, the M2a review fixes and the handoff note (`480c1ca`) |
+  | `main-9m65p0` | `main` plus the M2a minor findings and two Linux test fixes (cloud session) |
   | `milestone/m2a-dat-reader` | The M2a work, merged into `main` by fast-forward (`b230803`) |
   | `milestone/m1-bootable` | The M1 work, merged into `main` (`ad11969`) |
   | `docs/step1-spec` | The step 1 design spec, merged into `main` (`a8c75f6`) |
@@ -47,18 +56,29 @@ tree: the work below was requested and then paused before it started.
 
 ## Unfinished work
 
-### 1. Eight minor findings from the M2a final review (not started)
+### 1. Eight minor findings from the M2a final review (seven done, on `main-9m65p0`)
+
+Done in the cloud session, one commit each, every one with its test:
+
+| # | Finding | What was done |
+|---|---|---|
+| 1 | The install walk missed map files | `crates/pinewatch-dat/tests/install.rs` also walks each map's root `.dat` files and `Bundles/`, asserts that map files and a `Maps/*/English.dat` were found, and checks the walk on a made-up install tree. |
+| 3 | V18 | Settled and moved to the end of `docs/VERIFICATION.md`; the `ordered_members` comment is fixed; `equal_values_give_the_same_bits_in_any_order` covers `[1, 1, 0]` and a 20-member enum. |
+| 4 | No independent float bits | `corert_bits_from_an_independent_model` in `crates/pinewatch-mono/tests/floats.rs` pins 27 rows (14 corert quirks, both review cases among them). They came from a separate big-integer model of upstream `Number.CoreRT.cs` (`mono/corert` `11136ad5`); the upstream tables equal the port's, and the model agreed with the port on 20,000 generated decimals. V16 records this. |
+| 5 | Tokenizer comment | Fixed (the SDK blob is LF); the case runs with LF and CRLF. |
+| 6 | README status, V19 | The status line now says the reader isn't yet confirmed by the harness. `TypeResolver::resolve` and both `parse_type` helpers return `Result<_, MonoException>`, `ExceptionKind::FileLoad` is new, and tests check that a resolver's exception propagates. V19 updated. |
+| 7 | Message texts against `UnturnedDat.dll` | New `crates/pinewatch-dat/tests/shipped_messages.rs`: every tokenizer, parser and `Data.cs` message is produced through the port and looked up in the `#US` heap of `UnturnedDat.dll` or `Assembly-CSharp.dll`, as a `string.Format` template or as `string.Concat` pieces. **The assembly half has only been skipped so far**; its first real run is on the PC. |
+| 8 | Six clippy warnings | Fixed; `clippy --workspace --all-targets` is clean on Linux. |
+
+Also fixed, because they failed on Linux: the missing-heightmap test in `crates/pinewatch-level/tests/tiles.rs` now
+expects the `/` form there, and the screenshot test in `crates/pinewatch/tests/exe.rs` checks an upper-case install
+path only on Windows and macOS (on Linux it is a different folder). Neither changes production behavior.
+
+Still open:
 
 | # | Finding | Suggested fix, with its regression test |
 |---|---|---|
-| 1 | `crates/pinewatch-dat/tests/install.rs` walks only `Bundles/` and `Localization/`. The game also parses `Maps/*/English.dat` with a reused `DatParser` (`LevelInfo.getLocalization` through `ReadWrite.ReadDataWithoutHash`). | Add the map files (and any `Maps/*/Bundles/`) to the walk, and assert that map files were found. |
-| 2 | V17 can be narrowed. In the shipped IL, `OrdinalIgnoreCase` equality and hashing both fold each `char` through `TextInfo.ToUpper`, so only the table data (V3) is open. | Re-check with the IL dump, then update V17 in `docs/VERIFICATION.md`. |
-| 3 | V18 can be settled: an unstable sort only reorders members with equal values, and those give the same bits. The "stable up to 16 members" wording is also wrong (the three-element case reorders `[1, 1, 0]`). | Move V18 to "Settled", fix the comment on `ordered_members` in `crates/pinewatch-mono/src/enums.rs`, and add a test with equal-valued names out of order. |
-| 4 | `crates/pinewatch-mono/tests/floats.rs` has no independently computed expected bits. | Pin corert quirks, for example `"-1.79769313486231571982965e-323"` → `0x8000000000000003` and `"2.4703282292062328e-324"` → `0x0000000000000001`, plus more cases from an independent model of corert's algorithm. |
-| 5 | The comment on `compare_with_and_without_comments` in `crates/pinewatch-dat/tests/tokenizer.rs` says the C# file has CRLF line ends. The SDK blob is LF; the CRLF comes from `core.autocrlf` in this checkout. | Fix the comment and run the case with both LF and CRLF. |
-| 6 | The README's status line claims more than the reference harness has confirmed. V19 could note that `Type.GetType` still throws some exceptions with `throwOnError: false` (for example `FileLoadException` for an assembly-qualified name). | Reword the status line; update V19, and consider letting `TypeResolver::resolve` return a `Result`, with a test that its error propagates through `parse_type`. |
-| 7 | Nothing checks the message format strings against the shipped `UnturnedDat.dll` the way `shipped_mscorlib` checks `mscorlib.dll`. | Add an install test that finds each format string the port uses among the DLL's string literals, and `Data.cs`'s "Duplicate key" text in `Assembly-CSharp.dll`. |
-| 8 | Six clippy warnings in M1 code: `crates/pinewatch-io/src/install.rs:122,133` and `crates/pinewatch/src/app.rs:79,80,137` (collapsible `if`), and `crates/pinewatch-mono/tests/net_string.rs:21` (comparison to an empty slice). | Collapse the `if`s. In `net_string.rs` the comparison tests `PartialEq<&str>` with `""` on purpose, so allow the lint there. |
+| 2 | V17 can be narrowed. In the shipped IL, `OrdinalIgnoreCase` equality and hashing both fold each `char` through `TextInfo.ToUpper`, so only the table data (V3) is open. | Re-check with the IL dump of the shipped `mscorlib.dll` (Windows PC only), then update V17 in `docs/VERIFICATION.md`. |
 
 ### 2. M2b, the reference harness (not started; no plan written yet)
 
@@ -101,9 +121,12 @@ on this repository while the PC is off. `CLAUDE.md` carries his rules into those
 
 ## Exact next steps, when the owner gives the command
 
-1. **The eight minor findings.** Branch `maintenance/m2a-minors` from `main`. Fix each finding with its regression
-   test, run `cargo test --workspace`, `cargo clippy --workspace --all-targets` and `cargo xtask check-deps` on the
-   Windows PC, fast-forward `main`, and push `main` and the branch.
+1. **Finish the minor findings on the Windows PC.** `git fetch` and check out `main-9m65p0` (it is `main` plus the
+   fixes, so `main` can fast-forward to it). Do finding 2 with the IL dump and update V17. Run `cargo test
+   --workspace` (expect 404 tests, none skipped; the new install checks, the map walk and the assembly half of
+   `shipped_messages`, run there for the first time), `cargo clippy --workspace --all-targets` and `cargo xtask check-deps`. If `shipped_messages` finds a
+   text missing, compare it with the shipped literal before changing anything: the port must match the DLL. Then
+   fast-forward `main` and push it.
 2. **M2b.** Write the spec and the plan (`docs/superpowers/plans/<date>-m2b-reference-harness.md`) from the scope
    above, choosing between the Unity Editor in batch mode and the game's own Mono runtime for each check. Then
    implement it on the Windows PC with tests first, run the comparisons, and update `docs/VERIFICATION.md` and
@@ -120,6 +143,8 @@ on this repository while the PC is off. `CLAUDE.md` carries his rules into those
 - The vector helpers, `legacy_parse_vector3` included, return `Result`, because `String.IndexOf` throws for a value
   that ends with `(`.
 - `DatComment::join_lines` returns an `Option`, because the C# returns null.
+- `TypeResolver::resolve` returns `Result<Option<TypeHandle>, MonoException>` (cloud session): `Type.GetType` can
+  throw even with `throwOnError: false`, and `ParseType` doesn't catch.
 - Not ported yet: the writers and editable nodes, the twelve `DateTime` test rows, the asset, master-bundle and
   audio references and the hash in `Data.cs`, `readByteArray`, and `UnturnedDatEx`.
 - Open gaps: V3, V17, V19 and V20 in `docs/VERIFICATION.md`, and L7 (stack depth for extremely deep nesting) in
