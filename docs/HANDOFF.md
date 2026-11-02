@@ -20,7 +20,16 @@ tree: the work below was requested and then paused before it started.
 
 - **Tags:** none.
 - **Submodule:** `reference/u3-sdk` is the U3 SDK source at `aba323a` (tag `v3.26.3.12`), the code Pinewatch ports.
-  After cloning, run `git submodule update --init`.
+  After cloning, run `git submodule update --init`. On Windows, turn on long paths first, because some SDK file
+  paths pass Windows' 260-character limit and the checkout otherwise fails with "Filename too long":
+
+  ```
+  git config core.longpaths true
+  git -c core.longpaths=true submodule update --init
+  ```
+
+- **Working from the Windows PC:** `C:\Pinewatch` tracks `origin` (`main` is set up to track `origin/main`). Use
+  `git pull` and `git push` as usual; Git Credential Manager signs in as ZephKrnl.
 
 ## Rules that carry over
 
