@@ -99,7 +99,7 @@ on the branch. M2c comes before M2b because M2b needs the PC.
 | 9 Asset index | Done | `AssetMapping` (legacy tables, GUID dictionary, asset list, modification counter), `AddToMapping` with its messages, the 10 `FriendlyName` overrides, `ItemAsset.isPro`, `RedirectorAsset` |
 | 10 Asset references | Done | `AssetReference`, `ContentReference`, `MasterBundleReference`, `AudioReference` and their readers; `CachingAssetRef`, `CachingBcAssetRef` (cache, `IsReferenceTo`, `ToString`, parsers); `AssetLoader::find_legacy`; the rest of `UnturnedDatEx` except its writers |
 | 11 `LandscapeMaterialAsset`, holiday redirects | Done, inputs open | `LandscapeMaterialAsset` (`AssetHeader::landscape_material`), `EPhysicsMaterial`, `ERayMask`, `ENPCHoliday`, `holiday_redirect`; `AssetLoader::find` (redirectors) and `find_landscape_material`; `ClientAssetIntegrity`; `load_client_assets`; tiles read with `TileAssets` (holiday swap, known-missing check, `updatePrototypes`' requests). Open: the holiday inputs (V14) |
-| 12 The whole install | First part | `pinewatch-assets/tests/install.rs` loads and indexes every location; asserts the core bundle, 5,000+ assets and item ID 1 |
+| 12 The whole install | Done, not yet run | `pinewatch-assets/tests/install.rs` loads and indexes every location; asserts the core bundle, 5,000+ assets, item ID 1 with a friendly name, landscape materials and `Fallback_Green`. It skips without the install, so it has never run |
 
 Shared pieces added on the way: `MonoDictionary` (`Dictionary<K, V>`'s slot order, which the asset list depends
 on), `Guid`'s `D` format, and the `net_enum!` macro, which declares a ported C# enum from one member list. A
@@ -147,7 +147,7 @@ only where file systems ignore case. Neither changes production behavior.
 
 ### 2. In the cloud (no PC needed)
 
-- **The rest of M2c task 12** (the plan lists what it still needs).
+- **M2c is written in full.** What remains of it is the PC run of its install tests (section 1).
 - Cloud disk is a fixed allowance: if linking the app fails with `signal 7 [Bus error]`, the disk is full of old
   app binaries (about 1.8 GB each); `cargo clean -p pinewatch` frees them.
 - Later plans: M2d (asset processor) and M2e (terrain materials) need Unity on the PC.
@@ -173,9 +173,9 @@ sessions anyway. No dev container exists. `CLAUDE.md` carries his rules into tho
    warns too when a material is really missing. If a shipped-text test fails, compare with the DLL before changing
    anything: the port must match it. Run `cargo clippy --workspace --all-targets` and `cargo xtask check-deps`. Do
    the V17, V3 and V21 checks above and update `docs/VERIFICATION.md`. Then fast-forward `main` and push it.
-2. **In the cloud or on the PC:** the rest of M2c task 12 (the plan lists it), test first, one commit per step, as
-   tasks 1 to 11 were done. The holiday inputs (V14) wait for the level config and the provider. After M2c, the
-   next plans are M2d (asset processor) and M2e (terrain materials), which need Unity on the PC.
+2. **M2c is written in full** (tasks 1 to 12), but its install tests have never run: they skip without the game.
+   The PC run in step 1 is their first. The holiday inputs (V14) wait for the level config and the provider. The
+   next plans, M2d (asset processor) and M2e (terrain materials), need Unity on the PC.
 3. **On the PC:** M2b: write its spec and plan, choosing between the Unity Editor in batch mode and the game's own
    Mono runtime for each check, then implement it test first and record what the comparisons show.
 

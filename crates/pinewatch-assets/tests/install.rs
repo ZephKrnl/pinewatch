@@ -1,9 +1,14 @@
-//! The whole install through what M2c has so far: every client search location searched and read, every
-//! definition loaded and indexed. Asserts the core master bundle, plenty of assets in the index and the item with
-//! legacy ID 1 (the Eaglefire), and prints the messages. The install is only read. Skipped without an install.
+//! The whole install through M2c: every client search location searched and read, every definition loaded,
+//! populated as far as ported, and indexed. Asserts the core master bundle, plenty of assets in the index, the item
+//! with legacy ID 1 (the Eaglefire) with a friendly name, the landscape materials and the tiles' default one, and
+//! prints the messages. The install is only read. Skipped without an install.
 
-use pinewatch_assets::{AssetLoader, Origins, client_search_locations, read_location};
+use pinewatch_assets::{AssetLoader, AssetReference, Origins, client_search_locations, read_location};
 use pinewatch_io::{LogLevel, MemoryLog, find_install};
+use pinewatch_mono::{Guid, NetString};
+
+/// `LandscapeTile.DEFAULT_MATERIAL` ("Fallback_Green"), which every tile has in its first slot by default.
+const FALLBACK_GREEN: &str = "498ca625072d443a876b2a4f11896018";
 
 #[test]
 fn every_search_location_reads_and_loads() {
@@ -30,16 +35,26 @@ fn every_search_location_reads_and_loads() {
 
     let mapping = loader.mapping();
     assert!(mapping.asset_list().len() >= 5000, "only {} assets in the index", mapping.asset_list().len());
-    assert!(mapping.find_legacy(pinewatch_assets::EAssetType::Item, 1).is_some(), "no item with legacy ID 1");
+    let eaglefire = mapping.find_legacy(pinewatch_assets::EAssetType::Item, 1).expect("no item with legacy ID 1");
+    assert!(!loader.headers[eaglefire].friendly_name.is_empty(), "item 1 has no friendly name");
+
+    let materials = loader.headers.iter().filter(|header| header.landscape_material.is_some()).count();
+    assert!(materials > 0, "no landscape materials");
+    let fallback = AssetReference { guid: Guid::try_parse(Some(&NetString::from(FALLBACK_GREEN))).unwrap() };
+    let mut find_log = MemoryLog::default();
+    assert!(loader.find_landscape_material(fallback, &mut find_log).is_some(), "no Fallback_Green material");
 
     let warnings = log.entries.iter().filter(|(level, _)| *level == LogLevel::Warn).count();
     let errors = log.entries.iter().filter(|(level, _)| *level == LogLevel::Error).count();
     eprintln!(
-        "{} locations, {} master bundles, {} assets ({} indexed), {warnings} warnings, {errors} errors",
+        "{} locations, {} master bundles, {} assets ({} indexed, {materials} landscape materials), item 1 is {:?}, \
+         {warnings} warnings, {errors} errors, {} reported asset errors",
         locations.len(),
         loader.master_bundles.len(),
         loader.headers.len(),
-        mapping.asset_list().len()
+        mapping.asset_list().len(),
+        loader.headers[eaglefire].friendly_name,
+        loader.errors.len()
     );
     for (level, text) in log.entries.iter().filter(|(level, _)| *level != LogLevel::Info).take(20) {
         eprintln!("  [{level}] {text}");
