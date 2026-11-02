@@ -50,12 +50,16 @@ fn screenshot_inside_the_install_is_refused_before_anything_is_written() {
     let install = TempDir::fake_install("screenshot");
     let root = install.0.to_str().unwrap().to_string();
     let dir_name = install.0.file_name().unwrap().to_str().unwrap().to_string();
-    let targets = [
+    let mut targets = vec![
         format!("{root}/new-folder/shot.png"),
         format!("{root}/Maps/shot.png"),
         format!("{root}/../{dir_name}/shot.png"),
-        format!("{}/MAPS/shot.png", root.to_uppercase()),
     ];
+    // Another letter case names the same folder only where the file system ignores case. On Linux it is a
+    // different path, outside the install.
+    if cfg!(any(windows, target_os = "macos")) {
+        targets.push(format!("{}/MAPS/shot.png", root.to_uppercase()));
+    }
     for target in targets {
         let (code, stderr) = run(&["--unturned", &root, "--screenshot", &target]);
         assert_eq!(code, Some(2), "{target}: {stderr}");
