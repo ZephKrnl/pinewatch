@@ -293,6 +293,12 @@ fn more_than_eight_materials_throws() {
     one_tile_with_materials(&dir, 0, 0, &vec![format!("\"{GUID_A}\""); 9].join(" "));
     let err = read(&dir, &default_assets(&dir), &mut MemoryLog::default()).unwrap_err();
     assert_eq!(err.kind, ExceptionKind::ArgumentOutOfRange);
+    // `List<T>`'s indexer (V15, V7), with the platform's NewLine.
+    let expected = format!(
+        "Index was out of range. Must be non-negative and less than the size of the collection.{}Parameter name: index",
+        pinewatch_mono::NEW_LINE
+    );
+    assert_eq!(err.message, expected);
 }
 
 #[test]

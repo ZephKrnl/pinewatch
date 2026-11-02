@@ -227,9 +227,6 @@ isn't set up. Each entry says what the Rust code does, where the behavior came f
   holidays). Until they come, Pinewatch reads tiles as the game does outside holidays. `updatePrototypes`' Unity
   terrain layers (`getOrCreateLayer`, which loads the textures) come with the terrain materials (M2e). **Fix:** the
   inputs with the level config and the provider.
-- **V15. More than 8 materials.** `materials[layer] = …` on the 8-slot `InspectableList` is assumed to throw
-  `List<T>`'s `ArgumentOutOfRangeException` (`Index was out of range. …` + NewLine + `Parameter name: index`).
-  **Check:** `InspectableList`'s indexer.
 
 ## `pinewatch-dat`
 
@@ -288,3 +285,8 @@ Settled 2026-11-02 from the source, without the harness:
   every size (the three-element case reorders `[1, 1, 0]`), but it only reorders members with equal values, and
   those give the same bits whichever matches first. Pinewatch's stable sort therefore gives the same results. The
   test `equal_values_give_the_same_bits_in_any_order` covers it.
+- **V15. More than 8 materials.** `InspectableList<T>` (`Framework/Debug/InspectableList.cs`) derives from `List<T>`
+  and hides only `Add`, `Remove` and `RemoveAt`, not the indexer, and `LandscapeTile`'s constructor fills it with 8
+  entries (the default material, then 7 invalid references). So `materials[layer] = …` for layer 8 or more throws
+  `List<T>`'s `ArgumentOutOfRangeException`, V7's message, as `more_than_eight_materials_throws` expects. Settled
+  during the stabilization pass.
