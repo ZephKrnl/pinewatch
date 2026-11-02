@@ -162,6 +162,18 @@ fn key_line_number_is_never_available() {
     assert_eq!(None, dictionary.key_line_number("k"));
 }
 
+/// In metadata mode a comment line is a token, so after a value it takes the place of the second line break that
+/// `ReadDictionaryValue` reads past. A duplicate-key message then names another line than with metadata off, in
+/// the C# as here.
+#[test]
+fn metadata_changes_the_line_of_a_duplicate_key_message() {
+    let input = "a 1\na 2\n// c\n";
+    let (parser, _) = parse(input);
+    assert_eq!(parser.error_messages(), ["duplicate key \"a\" on line 4 replacing existing value \"1\" with \"2\""]);
+    let (parser, _) = parse_with_metadata(input);
+    assert_eq!(parser.error_messages(), ["duplicate key \"a\" on line 3 replacing existing value \"1\" with \"2\""]);
+}
+
 /// Without metadata, no node has line numbers.
 #[test]
 fn no_line_numbers_without_metadata() {
