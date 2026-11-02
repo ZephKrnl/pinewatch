@@ -131,35 +131,36 @@ fn tokenize_list() {
 }
 
 /// Test that enabling/disabling comment tokenization doesn't affect non-comment tokens. The C# input is a verbatim
-/// string in a file with CRLF line ends and tab indents.
+/// string with tab indents. The SDK stores the C# file with LF line ends; a checkout with `core.autocrlf` turns
+/// them into CRLF, so the case runs with both.
 #[test]
 fn compare_with_and_without_comments() {
-    let input = concat!(
-        "// A comment\r\n",
-        "// Another comment\r\n",
-        "Key1 \"Value1\" // Inline comment\r\n",
-        "\r\n",
-        "// Comment 4\r\n",
-        "Key2 Value2\r\n",
-        "List\r\n",
-        "[\r\n",
-        "\t// Comment 5\r\n",
-        "\tList Item 1\r\n",
-        "\r\n",
-        "\t// Comment 6\r\n",
-        "\t\"List Item 2\" // Another inline comment\r\n",
-        "]\r\n",
-        "\r\n",
-        "// Comment 7\r\n",
-        "// Comment 8\r\n",
-        "Dictionary\r\n",
-        "{\r\n",
-        "\t// Comment 9\r\n",
-        "\tKey3 Value3\r\n",
-        "\tKey4 Value4\r\n",
-        "}\r\n",
-        "\r\n",
-        "Key5 Mis-configured comment example // Not a comment\r\n",
+    let input_lf = concat!(
+        "// A comment\n",
+        "// Another comment\n",
+        "Key1 \"Value1\" // Inline comment\n",
+        "\n",
+        "// Comment 4\n",
+        "Key2 Value2\n",
+        "List\n",
+        "[\n",
+        "\t// Comment 5\n",
+        "\tList Item 1\n",
+        "\n",
+        "\t// Comment 6\n",
+        "\t\"List Item 2\" // Another inline comment\n",
+        "]\n",
+        "\n",
+        "// Comment 7\n",
+        "// Comment 8\n",
+        "Dictionary\n",
+        "{\n",
+        "\t// Comment 9\n",
+        "\tKey3 Value3\n",
+        "\tKey4 Value4\n",
+        "}\n",
+        "\n",
+        "Key5 Mis-configured comment example // Not a comment\n",
         "Flag // With mis-configured comment",
     );
 
@@ -221,11 +222,13 @@ fn compare_with_and_without_comments() {
         token(T::Value, "// With mis-configured comment"),
     ];
 
-    test_tokenizer(input, &expected_tokens, true);
-
     let without_comments: Vec<DatToken> =
         expected_tokens.iter().filter(|token| token.token_type != T::Comment).cloned().collect();
-    test_tokenizer(input, &without_comments, false);
+    let input_crlf = input_lf.replace('\n', "\r\n");
+    for input in [input_lf, input_crlf.as_str()] {
+        test_tokenizer(input, &expected_tokens, true);
+        test_tokenizer(input, &without_comments, false);
+    }
 }
 
 /// `SkipUtf8Bom` compares characters, not bytes, and reads each one before comparing the next, so any prefix of
