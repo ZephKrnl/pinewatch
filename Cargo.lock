@@ -4460,6 +4460,7 @@ name = "pinewatch"
 version = "0.1.0"
 dependencies = [
  "bevy",
+ "pinewatch-assets",
  "pinewatch-io",
  "pinewatch-level",
  "winresource",
@@ -4504,6 +4505,7 @@ dependencies = [
 name = "pinewatch-level"
 version = "0.1.0"
 dependencies = [
+ "pinewatch-assets",
  "pinewatch-io",
  "pinewatch-kvt",
  "pinewatch-mono",

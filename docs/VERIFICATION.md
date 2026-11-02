@@ -201,15 +201,20 @@ isn't set up. Each entry says what the Rust code does, where the behavior came f
 - **V12. I/O exception messages (gap).** A file that exists but fails to read becomes an `IOException` carrying Rust's
   error text, not Mono's. **Fix:** map OS error codes to Mono's exception types and messages.
 - **V13. Culture-formatted numbers in messages (gap).** `LandscapeCoord.ToString()` and `UnturnedLog`'s
-  `string.Format` use the player's culture. M1 formats with the invariant culture, which only differs for negative
-  numbers in cultures with a different minus sign. **Fix:** culture support (`Culture` parameter, P5).
-- **V14. Holiday material redirects (in progress).** M2c task 11 ports `LandscapeMaterialAsset` and its
-  `getHolidayRedirect`: Christmas, Halloween and April Fools pick their redirect, and every other holiday value gives
-  none, including values no member has (the server sends the holiday, so any value can arrive). Still open: the swap
-  in `LandscapeTile.read` when `Level.shouldUseHolidayRedirects` is on, with the asset lookups around it, and the two
-  inputs: `Level.shouldUseHolidayRedirects` (it needs the level's `Allow_Holiday_Redirects`) and the active holiday
-  (`Provider.authorityHoliday`: from the server, or the holiday schedule when the mode config allows holidays).
-  **Fix:** the tile step next in task 11; the inputs with the level config and the provider.
+  `string.Format` use the player's culture, and so do the interpolated tile coordinates in the asset integrity
+  contexts (`Landscape tile (x: … y: … layer: …)`). Pinewatch formats with the invariant culture, which only differs
+  for negative numbers in cultures with a different minus sign. **Fix:** culture support (`Culture` parameter, P5).
+- **V14. Holiday material redirects (inputs open).** M2c task 11 ports `LandscapeMaterialAsset` and its
+  `getHolidayRedirect` (Christmas, Halloween and April Fools pick their redirect; every other holiday value gives
+  none, including values no member has, since the server sends the holiday), and the tile side: `LandscapeTile.read`
+  swaps a material for its redirect when `TileAssets::use_holiday_redirects` is on, records materials the assets lack
+  as known missing, and `updatePrototypes` queues every valid slot for the integrity check, in the original's order.
+  Still open are the two inputs, which `TileAssets::new` leaves off (no holiday): `Level.shouldUseHolidayRedirects`
+  (not the editor, the level's `Allow_Holiday_Redirects` from `Config.json`, a holiday active) and the active holiday
+  (`Provider.authorityHoliday`: the server's, or in singleplayer the holiday schedule when the mode config allows
+  holidays). Until they come, Pinewatch reads tiles as the game does outside holidays. `updatePrototypes`' Unity
+  terrain layers (`getOrCreateLayer`, which loads the textures) come with the terrain materials (M2e). **Fix:** the
+  inputs with the level config and the provider.
 - **V15. More than 8 materials.** `materials[layer] = …` on the 8-slot `InspectableList` is assumed to throw
   `List<T>`'s `ArgumentOutOfRangeException` (`Index was out of range. …` + NewLine + `Parameter name: index`).
   **Check:** `InspectableList`'s indexer.

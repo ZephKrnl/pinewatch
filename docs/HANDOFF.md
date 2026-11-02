@@ -10,7 +10,7 @@ file alone.
   the Windows run (see "Exact next steps").
 - **Done:** M1 (the bootable terrain viewer) and M2a (the `.dat` reader) are merged into `main`. On the Windows PC,
   with the game installed, `cargo test --workspace` passes all 396 tests on `main` and skips none.
-- **Linux (cloud):** on `main-9m65p0`, `cargo test --workspace` passes 494 tests (the install tests print
+- **Linux (cloud):** on `main-9m65p0`, `cargo test --workspace` passes 506 tests (the install tests print
   `skipped: no Unturned install found`; the Windows-only test doesn't build), `cargo clippy --workspace --all-targets`
   gives no warnings, and `cargo xtask check-deps` passes for the 7 format crates. Setup a fresh Linux machine needs:
   `apt-get install libasound2-dev libudev-dev libwayland-dev libxkbcommon-dev` (pkg-config was present),
@@ -98,12 +98,17 @@ on the branch. M2c comes before M2b because M2b needs the PC.
 | 8 Localization | Done | `Local`: `format`, `format_or_null`, `format_or_empty`, the English fallback, `has` |
 | 9 Asset index | Done | `AssetMapping` (legacy tables, GUID dictionary, asset list, modification counter), `AddToMapping` with its messages, the 10 `FriendlyName` overrides, `ItemAsset.isPro`, `RedirectorAsset` |
 | 10 Asset references | First part | `AssetReference`, `ContentReference`, `parse_guid_or_legacy_id`, `read_asset_reference`; still to do: `MasterBundleReference`, `AudioReference`, the caching references, the rest of `UnturnedDatEx` |
-| 11 `LandscapeMaterialAsset`, holiday redirects | First part | `LandscapeMaterialAsset` (`AssetHeader::landscape_material`), `EPhysicsMaterial`, `ERayMask`, `ENPCHoliday`, `holiday_redirect`; still to do: `Assets.find`, `ClientAssetIntegrity`, the tile side (V14) |
+| 11 `LandscapeMaterialAsset`, holiday redirects | Done, inputs open | `LandscapeMaterialAsset` (`AssetHeader::landscape_material`), `EPhysicsMaterial`, `ERayMask`, `ENPCHoliday`, `holiday_redirect`; `AssetLoader::find` (redirectors) and `find_landscape_material`; `ClientAssetIntegrity`; `load_client_assets`; tiles read with `TileAssets` (holiday swap, known-missing check, `updatePrototypes`' requests). Open: the holiday inputs (V14) |
 | 12 The whole install | First part | `pinewatch-assets/tests/install.rs` loads and indexes every location; asserts the core bundle, 5,000+ assets and item ID 1 |
 
 Shared pieces added on the way: `MonoDictionary` (`Dictionary<K, V>`'s slot order, which the asset list depends
 on), `Guid`'s `D` format, and the `net_enum!` macro, which declares a ported C# enum from one member list. A
 class's `PopulateAsset` that throws now takes `LoadFile`'s "Caught exception while populating" path.
+
+Since task 11, `pinewatch-level` depends on `pinewatch-assets`: `read_landscape` takes a `TileAssets` (the loaded
+assets, the holiday switch and the integrity state). The app loads every client asset before the map, as the game
+does, so it starts slower and prints the asset system's messages; the level install test does the same, and its
+"no warnings" check now also means every official map's tile materials are among the loaded assets.
 
 New register and verification entries: L3 (d) no `Sandbox` folder is created, L3 (e) a missing GUID is never
 written, L5 made concrete for the asset worker, L11 no workshop yet; V21 the `WITH_NOREDIST` build assumption, V22
@@ -142,7 +147,9 @@ only where file systems ignore case. Neither changes production behavior.
 
 ### 2. In the cloud (no PC needed)
 
-- **The rest of M2c tasks 11 and 10**, then the rest of task 12 (the plan lists what each still needs).
+- **The rest of M2c task 10**, then the rest of task 12 (the plan lists what each still needs).
+- Cloud disk is a fixed allowance: if linking the app fails with `signal 7 [Bus error]`, the disk is full of old
+  app binaries (about 1.8 GB each); `cargo clean -p pinewatch` frees them.
 - Later plans: M2d (asset processor) and M2e (terrain materials) need Unity on the PC.
 
 ### 3. Phone and cloud access
@@ -158,14 +165,17 @@ sessions anyway. No dev container exists. `CLAUDE.md` carries his rules into tho
 
 ## Exact next steps
 
-1. **On the Windows PC:** `git fetch`, check out `main-9m65p0`. Run `cargo test --workspace` (expect 495 tests,
+1. **On the Windows PC:** `git fetch`, check out `main-9m65p0`. Run `cargo test --workspace` (expect 507 tests,
    none skipped: the Windows-only test, plus the install tests that skip on Linux run for the first time, among them
    the map walk, `shipped_messages`' assembly half, `shipped_mscorlib` with the five new strings, and the assets
-   install test). If a shipped-text test fails, compare with the DLL before changing anything: the port must match
-   it. Run `cargo clippy --workspace --all-targets` and `cargo xtask check-deps`. Do the V17, V3 and V21 checks above
-   and update `docs/VERIFICATION.md`. Then fast-forward `main` and push it.
-2. **In the cloud or on the PC:** the rest of M2c task 11 (`Assets.find`, `ClientAssetIntegrity`, the tile side),
-   then the rest of 10 and 12, test first, one commit per step, as tasks 1 to 9 were done.
+   install test). If the level install test reports `Context "Landscape tile …" missing asset` warnings, look for the
+   same lines in the original game's `Logs/Client.log` after loading that map before changing anything: the game
+   warns too when a material is really missing. If a shipped-text test fails, compare with the DLL before changing
+   anything: the port must match it. Run `cargo clippy --workspace --all-targets` and `cargo xtask check-deps`. Do
+   the V17, V3 and V21 checks above and update `docs/VERIFICATION.md`. Then fast-forward `main` and push it.
+2. **In the cloud or on the PC:** the rest of M2c task 10 (`MasterBundleReference`, `AudioReference`, the caching
+   references, the rest of `UnturnedDatEx`), then the rest of 12, test first, one commit per step, as tasks 1 to 11
+   were done. The holiday inputs (V14) wait for the level config and the provider.
 3. **On the PC:** M2b: write its spec and plan, choosing between the Unity Editor in batch mode and the game's own
    Mono runtime for each check, then implement it test first and record what the comparisons show.
 

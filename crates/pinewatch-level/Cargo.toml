@@ -10,4 +10,5 @@ publish.workspace = true
 pinewatch-mono.workspace = true
 pinewatch-io.workspace = true
 pinewatch-kvt.workspace = true
+pinewatch-assets.workspace = true
 sha1.workspace = true

@@ -5,8 +5,9 @@ use std::process::ExitCode;
 
 use bevy::prelude::*;
 use bevy::render::view::screenshot::{Screenshot, ScreenshotCaptured, save_to_disk};
+use pinewatch_assets::{ClientAssetIntegrity, load_client_assets};
 use pinewatch_io::{InstallRoot, StderrLog, find_install};
-use pinewatch_level::read_landscape;
+use pinewatch_level::{TileAssets, read_landscape};
 
 use crate::camera::FlyCameraPlugin;
 use crate::cli::{USAGE, parse_args};
@@ -14,7 +15,7 @@ use crate::screenshot::{inside_install, modified_time, was_written};
 use crate::terrain::{LoadedTerrain, TerrainPlugin};
 
 /// Exit codes: 2 = bad options, no install, unknown map or a screenshot path inside the install;
-/// 3 = map has no landscape; 4 = map failed to load; 5 = the screenshot wasn't saved.
+/// 3 = map has no landscape; 4 = the assets or the map failed to load; 5 = the screenshot wasn't saved.
 pub fn main() -> ExitCode {
     let cli = match parse_args(std::env::args_os()) {
         Ok(cli) => cli,
@@ -62,7 +63,16 @@ pub fn main() -> ExitCode {
         return ExitCode::from(2);
     };
 
-    let tiles = match read_landscape(&install, &map, &mut StderrLog) {
+    // The game loads every asset before it loads a level: the tiles look their materials up.
+    let assets = match load_client_assets(&install, "English", &mut StderrLog) {
+        Ok(assets) => assets,
+        Err(error) => {
+            eprintln!("Failed to load assets: {error}");
+            return ExitCode::from(4);
+        }
+    };
+    let mut integrity = ClientAssetIntegrity::default();
+    let tiles = match read_landscape(&install, &map, &mut TileAssets::new(&assets, &mut integrity), &mut StderrLog) {
         Ok(Some(tiles)) if !tiles.is_empty() => tiles,
         Ok(_) => {
             eprintln!(

@@ -1,9 +1,11 @@
-//! Landscape tiles: ports of `Landscape.read`, `LandscapeTile.read`, `readHeightmap`, `readSplatmap`,
-//! `ReadHoles`, `LandscapeCoord.read` and `AssetReference.read` (Framework/Landscapes, Unturned/Bundles).
+//! Landscape tiles: ports of `Landscape.read`, `LandscapeTile.read` (with its asset checks and holiday redirects),
+//! `updatePrototypes`' asset checks, `readHeightmap`, `readSplatmap`, `ReadHoles`, `LandscapeCoord.read` and
+//! `AssetReference.read` (Framework/Landscapes, Unturned/Bundles).
 
 use std::fmt;
 use std::io;
 
+use pinewatch_assets::{AssetLoader, AssetReference, ClientAssetIntegrity, ENPCHoliday};
 use pinewatch_io::mono_path::{self, PathStyle};
 use pinewatch_io::{InstallRoot, LogLevel, LogSink};
 use pinewatch_kvt::{KvtCursor, read_kvt_bytes};
@@ -11,6 +13,26 @@ use pinewatch_mono::{ExceptionKind, Guid, MonoException};
 use sha1::{Digest, Sha1};
 
 use crate::hierarchy::walk_hierarchy;
+
+/// What reading tiles takes besides the map's files: the asset system and the state around it.
+pub struct TileAssets<'a> {
+    /// The loaded assets, for `AssetReference<LandscapeMaterialAsset>.Find()`.
+    pub loader: &'a AssetLoader,
+    /// `Level.shouldUseHolidayRedirects`: outside the editor, when the level allows holiday redirects and a
+    /// holiday is active (V14).
+    pub use_holiday_redirects: bool,
+    /// `HolidayUtil.getActiveHoliday()`, which picks each material's redirect.
+    pub active_holiday: ENPCHoliday,
+    /// The client's asset checks.
+    pub integrity: &'a mut ClientAssetIntegrity,
+}
+
+impl<'a> TileAssets<'a> {
+    /// No active holiday, so no holiday redirects.
+    pub fn new(loader: &'a AssetLoader, integrity: &'a mut ClientAssetIntegrity) -> Self {
+        Self { loader, use_holiday_redirects: false, active_holiday: ENPCHoliday::NONE, integrity }
+    }
+}
 
 /// `Landscape.TILE_SIZE`: a tile covers 1024 × 1024 world units.
 pub const TILE_SIZE: f32 = 1024.0;
@@ -170,6 +192,7 @@ fn io_exception(error: io::Error) -> MonoException {
 pub fn read_landscape(
     install: &InstallRoot,
     map_folder: &str,
+    assets: &mut TileAssets<'_>,
     log: &mut dyn LogSink,
 ) -> Result<Option<Vec<LandscapeTile>>, MonoException> {
     let map = MapPaths::new(install, map_folder);
@@ -183,7 +206,8 @@ pub fn read_landscape(
     let mut landscape: Option<Vec<LandscapeTile>> = None;
     walk_hierarchy(&table, log, |item, mut item_reader, log| {
         if item.type_name.as_ref().is_some_and(|name| *name == LANDSCAPE_TYPE) {
-            read_landscape_item(install, &map, item.instance_id.unwrap_or(0), &mut item_reader, &mut landscape, log)?;
+            let instance_id = item.instance_id.unwrap_or(0);
+            read_landscape_item(install, &map, instance_id, &mut item_reader, &mut landscape, assets, log)?;
         }
         Ok(())
     })?;
@@ -197,6 +221,7 @@ fn read_landscape_item(
     instance_id: u32,
     item_reader: &mut KvtCursor<'_>,
     landscape: &mut Option<Vec<LandscapeTile>>,
+    assets: &mut TileAssets<'_>,
     log: &mut dyn LogSink,
 ) -> Result<(), MonoException> {
     let mut reader = item_reader.read_object()?.ok_or_else(MonoException::null_reference)?;
@@ -213,7 +238,7 @@ fn read_landscape_item(
     let mut tiles: Vec<LandscapeTile> = Vec::new();
     for tile_index in 0..tile_count {
         reader.read_array_index(tile_index);
-        let tile = read_tile(install, map, &mut reader, log)?;
+        let tile = read_tile(install, map, &mut reader, assets, log)?;
         if tiles.iter().any(|t| t.coord == tile.coord) {
             log.log(LogLevel::Error, &format!("Duplicate landscape coord read: {}", tile.coord));
         } else {
@@ -229,6 +254,7 @@ fn read_tile(
     install: &InstallRoot,
     map: &MapPaths,
     reader: &mut KvtCursor<'_>,
+    assets: &mut TileAssets<'_>,
     log: &mut dyn LogSink,
 ) -> Result<LandscapeTile, MonoException> {
     let mut tile_reader = reader.read_object()?.ok_or_else(MonoException::null_reference)?;
@@ -253,17 +279,64 @@ fn read_tile(
                 nested.read_guid()?
             }
         };
+        let reference = check_material(AssetReference { guid }, tile.coord, layer, assets, log);
+        // `materials[layer] = materialRef`, after the checks.
         let slot = usize::try_from(layer)
             .ok()
             .and_then(|l| tile.materials.get_mut(l))
             .ok_or_else(MonoException::list_index_out_of_range)?;
-        *slot = guid;
+        *slot = reference.guid;
     }
+    update_prototypes(&tile, assets, log);
 
     read_heightmap(install, map, &mut tile, log)?;
     read_splatmap(install, map, &mut tile, log)?;
     read_holes(install, map, &mut tile)?;
     Ok(tile)
+}
+
+/// `LandscapeTile.read`'s checks of a material reference from the map, when it is valid: with holiday redirects on,
+/// the material's redirect for the active holiday replaces it when that redirect is valid; then a reference the
+/// assets can't find is recorded as known missing. The editor's asset redirector applies only in the editor.
+fn check_material(
+    mut reference: AssetReference,
+    coord: LandscapeCoord,
+    layer: i32,
+    assets: &mut TileAssets<'_>,
+    log: &mut dyn LogSink,
+) -> AssetReference {
+    if !reference.is_valid() {
+        return reference;
+    }
+    if assets.use_holiday_redirects
+        && let Some((_, original)) = assets.loader.find_landscape_material(reference, log)
+    {
+        let redirected = original.holiday_redirect(assets.active_holiday);
+        if redirected.is_valid() {
+            reference = redirected;
+        }
+    }
+    if assets.loader.find_landscape_material(reference, log).is_none() {
+        assets.integrity.server_add_known_missing_asset(reference.guid, &tile_context(coord, layer), log);
+    }
+    reference
+}
+
+/// `updatePrototypes` on a client, without the Unity terrain layers (M2e): every layer's material is looked up, and
+/// each valid reference is queued for the server's asset check.
+fn update_prototypes(tile: &LandscapeTile, assets: &mut TileAssets<'_>, log: &mut dyn LogSink) {
+    for (layer, &guid) in tile.materials.iter().enumerate() {
+        let reference = AssetReference { guid };
+        let material = assets.loader.find_landscape_material(reference, log).map(|(index, _)| index);
+        if reference.is_valid() {
+            assets.integrity.queue_request(guid, material, &tile_context(tile.coord, layer), log);
+        }
+    }
+}
+
+/// The context both checks give: the tile's coordinates and the layer, as integers in the invariant culture (V13).
+fn tile_context(coord: LandscapeCoord, layer: impl fmt::Display) -> String {
+    format!("Landscape tile (x: {} y: {} layer: {layer})", coord.x, coord.y)
 }
 
 fn tile_file_name(coord: LandscapeCoord, suffix: &str, extension: &str) -> String {

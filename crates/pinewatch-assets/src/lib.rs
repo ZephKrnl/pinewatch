@@ -1,7 +1,9 @@
 //! The game's asset system (`Assets` and `AssetsWorker` in the U3 SDK): search locations, the folder walk,
 //! definitions and translations, master bundles, and the asset index. See `docs/superpowers/plans/` (M2c).
 
+mod client;
 mod holiday;
+mod integrity;
 mod landscape_material;
 mod load;
 mod local;
@@ -16,7 +18,9 @@ mod search;
 mod types;
 mod worker;
 
+pub use client::load_client_assets;
 pub use holiday::ENPCHoliday;
+pub use integrity::ClientAssetIntegrity;
 pub use landscape_material::{EPhysicsMaterial, ERayMask, LandscapeMaterialAsset};
 pub use load::{AssetHeader, AssetLoader};
 pub use local::Local;

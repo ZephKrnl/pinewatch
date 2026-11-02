@@ -21,6 +21,7 @@ use crate::origin::{OriginId, Origins};
 use crate::populate::populate;
 use crate::paths::{MonoPath, STYLE};
 use crate::reader::{AssetDefinition, ResultItem};
+use crate::references::AssetReference;
 use crate::types::{AssetCategory, AssetType, AssetTypeResolver, EAssetType, legacy_asset_type};
 
 /// What `LoadFile` knows about an asset when it creates it: the asset's fields before its own `PopulateAsset`.
@@ -133,6 +134,38 @@ impl AssetLoader {
     /// `Assets.hasUnlinkedSpawns`: a spawn asset was added since spawns were last linked.
     pub fn has_unlinked_spawns(&self) -> bool {
         self.has_unlinked_spawns
+    }
+
+    /// `Assets.find(Guid)`: the asset with this GUID in the current mapping, with each redirector replaced by the
+    /// asset its target GUID finds. The 33rd redirect gives up with a warning.
+    pub fn find(&self, guid: Guid, log: &mut dyn LogSink) -> Option<usize> {
+        let dictionary = &self.default_mapping.asset_dictionary;
+        let mut result = dictionary.try_get_value(&guid).copied();
+        let mut redirects = 0;
+        // `target_guid` is set exactly for redirectors.
+        while let Some(target) = result.and_then(|index| self.headers[index].target_guid) {
+            result = dictionary.try_get_value(&target).copied();
+            redirects += 1;
+            if redirects > 32 {
+                log.log(LogLevel::Warn, &format!("Infinite asset director loop encountered when resolving: {guid}"));
+                return None;
+            }
+        }
+        result
+    }
+
+    /// `Assets.find<LandscapeMaterialAsset>(reference)`: nothing for an invalid reference, else what `find` finds
+    /// if it is a landscape material, with its index.
+    pub fn find_landscape_material(
+        &self,
+        reference: AssetReference,
+        log: &mut dyn LogSink,
+    ) -> Option<(usize, &LandscapeMaterialAsset)> {
+        if !reference.is_valid() {
+            return None;
+        }
+        let index = self.find(reference.guid, log)?;
+        self.headers[index].landscape_material.as_ref().map(|material| (index, material))
     }
 
     /// `origin.GetAssets()`: the assets added for this origin, in order.

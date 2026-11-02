@@ -1,20 +1,26 @@
+use pinewatch_assets::{ClientAssetIntegrity, load_client_assets};
 use pinewatch_io::{LogLevel, MemoryLog, find_install};
-use pinewatch_level::read_landscape;
+use pinewatch_level::{TileAssets, read_landscape};
 use sha1::{Digest, Sha1};
 
-/// Every official map's landscape loads: 160 tiles in total, every heightmap and splatmap read in full (the hash of
-/// the bytes consumed is the hash of the whole file), no warnings.
+/// Every official map's landscape loads after the assets, as in the game: 160 tiles in total, every heightmap and
+/// splatmap read in full (the hash of the bytes consumed is the hash of the whole file), no warnings (so every
+/// tile material is among the loaded assets).
 #[test]
 fn every_installed_landscape_loads() {
     let Ok(install) = find_install(None) else {
         eprintln!("skipped: no Unturned install found");
         return;
     };
+    let assets = load_client_assets(&install, "English", &mut MemoryLog::default()).expect("the client's assets");
     let mut total = 0;
     for name in install.read_dir("Maps").unwrap() {
         let name = name.to_string_lossy().into_owned();
         let mut log = MemoryLog::default();
-        let tiles = read_landscape(&install, &name, &mut log).unwrap_or_else(|e| panic!("{name}: {e}"));
+        // Each map starts with the integrity state `ClientAssetIntegrity.Clear` leaves when joining.
+        let mut integrity = ClientAssetIntegrity::default();
+        let mut context = TileAssets::new(&assets, &mut integrity);
+        let tiles = read_landscape(&install, &name, &mut context, &mut log).unwrap_or_else(|e| panic!("{name}: {e}"));
         let Some(tiles) = tiles else { continue };
         for tile in &tiles {
             let (x, y) = (tile.coord.x, tile.coord.y);

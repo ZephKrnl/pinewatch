@@ -9,5 +9,5 @@ mod landscape;
 pub use hierarchy::{HierarchyItem, read_hierarchy_items};
 pub use landscape::{
     HEIGHTMAP_RESOLUTION, HOLES_RESOLUTION, LANDSCAPE_TYPE, LandscapeCoord, LandscapeTile, SPLATMAP_LAYERS,
-    SPLATMAP_RESOLUTION, TILE_HEIGHT, TILE_SIZE, TileHashes, default_material, read_landscape,
+    SPLATMAP_RESOLUTION, TILE_HEIGHT, TILE_SIZE, TileAssets, TileHashes, default_material, read_landscape,
 };
