@@ -22,9 +22,14 @@ isn't set up. Each entry says what the Rust code does, where the behavior came f
     |---|---|
     | `ParseNumbers` | corefx `src/Common/src/CoreLib/System/ParseNumbers.cs` |
     | `Guid` parsing | corefx `src/Common/src/CoreLib/System/Guid.cs` |
-    | `Int32.TryParse` and `UInt32.TryParse` | corefx `Int32.cs` and `UInt32.cs` |
+    | Integer `TryParse` | corefx `SByte.cs`, `Byte.cs`, `Int16.cs`, `UInt16.cs`, `Int32.cs`, `UInt32.cs`, `Int64.cs`, `UInt64.cs` |
+    | `float` and `double` `TryParse` | corefx `Single.cs` and `Double.cs`; corert `src/System.Private.CoreLib/src/System/Number.CoreRT.cs` (`NumberToDouble`) |
     | Number parsing | corert `src/System.Private.CoreLib/shared/System/Number.Parsing.cs` |
     | Style validation | reference source `numberformatinfo.cs` |
+    | `Boolean.TryParse` | corefx `Boolean.cs` |
+    | `Enum.TryParse` | reference source `enum.cs` |
+    | `Single.Equals` (for Unity's `Color.Equals`) | corefx `Single.cs` |
+    | `String.IndexOf(char, int)` (for `UnityDatEx`) | corefx `String.Searching.cs` |
     | `StreamReader` | corefx `IO/StreamReader.cs` |
     | Text decoding | corefx `Text/UTF8Encoding.cs`, `Text/UnicodeEncoding.cs`, `Text/UTF32Encoding.cs`, `DecoderNLS.cs`, `DecoderReplacementFallback.cs` |
     | Exception messages | corefx exception classes; `mono/metadata/exception.c`; `mono/metadata/icall-windows.c` |
@@ -40,7 +45,9 @@ isn't set up. Each entry says what the Rust code does, where the behavior came f
     (`ldstr` literals, call targets, branch structure) of `ParseNumbers.IsDigit`, `Guid.TryParseGuid*`,
     `Guid.StringToInt`, `GuidResult.GetGuidParseException`, `ArgumentException.Message`,
     `NumberFormatInfo.ValidateParseStyleInteger`, `Int32.TryParse`, `List<T>`'s indexer, `Dictionary.FindEntry`,
-    `ThrowHelper` and `StreamReader` matched the ported source.
+    `ThrowHelper` and `StreamReader` matched the ported source, and so did `Single.Equals`, `Single.IsNaN` and
+    `String.IndexOf(char, int)` with the overload it calls, for M2a. The M2a final review also checked
+    `Boolean.TryParse` and `Enum.TryParseEnum` against the IL.
 
   **Check:** that Unity 2022.3.62f3's Mono matches commit `b8eb56f` in every other file Pinewatch ports. Unity
   publishes no exact build commit, and the runtime DLL doesn't embed one.
@@ -67,8 +74,12 @@ isn't set up. Each entry says what the Rust code does, where the behavior came f
 - **V3. Unicode tables (gap).** Above U+00FF, `IsWhiteSpace` uses Rust's `White_Space` property.
   `ToLowerInvariant` and `ToUpperInvariant` use Rust's mappings when they give a single code unit. .NET's simple
   mappings differ for a few characters, for example U+0130 lowercases to U+0069 in .NET but stays U+0130 here.
-  Mono may also use an older Unicode version. In M1 this only affects GUID text: trimming, the hex-digit check,
-  and the `x` of a hex prefix. **Fix:** dump Mono's tables for all 65,536 code units with the harness.
+  Mono may also use an older Unicode version. This affects GUID text (trimming, the hex-digit check, the `x` of a
+  hex prefix) and, since M2a, also: which characters end an unquoted `.dat` key or count as blank between tokens
+  (for example U+2028 or U+3000), `.dat` key matching (`OrdinalIgnoreCase`, V17), the trimming in
+  `Boolean.TryParse`, the trimming and ignore-case name match in `Enum.TryParse`, the trimming around the `float`
+  and `double` special symbols, and the legacy `readBoolean` (V20). **Fix:** dump Mono's tables for all 65,536 code
+  units with the harness.
 - **V4. UTF-8 decoding.** Ported from corefx `UTF8Encoding.GetChars`, the slow loop, which the fast loop hands every
   irregular sequence to. Each fallback is one U+FFFD. These lead bytes are invalid on their own: `80`–`BF`, `C0`,
   `C1` and `F5`–`FF`. An interrupted sequence is one fallback, and the interrupting byte is read again. A bad
