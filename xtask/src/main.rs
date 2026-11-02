@@ -8,7 +8,7 @@ use std::process::{Command, ExitCode};
 const ALLOWED_ROOTS: [&str; 3] = ["sha1", "png", "windows-sys"];
 
 /// The crates the allowlist applies to. Each plan that adds a format crate appends it here.
-const FORMAT_CRATES: [&str; 7] = [
+const FORMAT_CRATES: [&str; 8] = [
     "pinewatch-mono",
     "pinewatch-io",
     "pinewatch-kvt",
@@ -16,6 +16,7 @@ const FORMAT_CRATES: [&str; 7] = [
     "pinewatch-unity",
     "pinewatch-dat",
     "pinewatch-assets",
+    "pinewatch-binary",
 ];
 
 fn main() -> ExitCode {

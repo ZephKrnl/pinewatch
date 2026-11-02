@@ -28,4 +28,4 @@ pub use number::{
     NumberFormat, NumberStyles, try_parse_f32, try_parse_f64, try_parse_i8, try_parse_i16, try_parse_i32, try_parse_i64,
     try_parse_u8, try_parse_u16, try_parse_u32, try_parse_u64,
 };
-pub use text::decode_stream_reader_default;
+pub use text::{decode_stream_reader_default, utf8_get_string};

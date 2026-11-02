@@ -4477,6 +4477,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "pinewatch-binary"
+version = "0.1.0"
+dependencies = [
+ "pinewatch-mono",
+ "pinewatch-unity",
+ "sha1",
+]
+
+[[package]]
 name = "pinewatch-dat"
 version = "0.1.0"
 dependencies = [

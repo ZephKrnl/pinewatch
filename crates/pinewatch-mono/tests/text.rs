@@ -147,3 +147,15 @@ fn sequences_spanning_the_1024_byte_buffer_decode_whole() {
 fn non_bmp_character_becomes_surrogate_pair() {
     assert_eq!(decode("\u{1F600}".as_bytes()), vec![0xD83D, 0xDE00]);
 }
+
+/// `Encoding.UTF8.GetString` flushes its decoder: a sequence still incomplete at the end is one fallback, where a
+/// `StreamReader` keeps it pending. It keeps a byte order mark as U+FEFF.
+#[test]
+fn utf8_get_string_flushes_and_keeps_the_bom() {
+    let get_string = |bytes: &[u8]| pinewatch_mono::utf8_get_string(bytes).as_units().to_vec();
+    assert_eq!(get_string(&[b'a', 0xE2, 0x82]), units(&format!("a{R}")));
+    assert_eq!(decode(&[b'a', 0xE2, 0x82]), units("a"));
+    assert_eq!(get_string(&[0xEF, 0xBB, 0xBF, b'A']), units("\u{FEFF}A"));
+    assert_eq!(get_string(&[0xC3, 0x28]), units(&format!("{R}(")));
+    assert_eq!(get_string(&[]), units(""));
+}

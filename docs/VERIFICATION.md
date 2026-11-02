@@ -178,6 +178,13 @@ isn't set up. Each entry says what the Rust code does, where the behavior came f
   culture, which differs only for cultures whose positive or negative sign isn't `+` or `-`. **Fix:** culture
   support (`Culture` parameter, P5), with V13.
 
+## `pinewatch-binary`
+
+- **V30. `new byte[n]` with a negative `n` (check).** `Block.readByteArray` with `longBinaryData` passes a negative
+  `int` count straight to `new byte[count]`, which throws `OverflowException`. Pinewatch throws it with the default
+  constructor's message (`Arithmetic operation resulted in an overflow.`), as for other runtime exceptions, but
+  Mono's array allocation may set its own message. **Check:** the message of `new byte[-1]` on the game's runtime.
+
 ## `pinewatch-kvt`
 
 - **V9. Hierarchy hash (later step).** `LevelHierarchy.load` hashes the bytes its `StreamReader` pulled through

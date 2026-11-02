@@ -10,7 +10,7 @@ file alone.
   the Windows run (see "Exact next steps").
 - **Done:** M1 (the bootable terrain viewer) and M2a (the `.dat` reader) are merged into `main`. On the Windows PC,
   with the game installed, `cargo test --workspace` passes all 396 tests on `main` and skips none.
-- **Linux (cloud):** on `main-9m65p0`, `cargo test --workspace` passes 519 tests (the install tests print
+- **Linux (cloud):** on `main-9m65p0`, `cargo test --workspace` passes 532 tests (the install tests print
   `skipped: no Unturned install found`; the Windows-only test doesn't build), `cargo clippy --workspace --all-targets`
   gives no warnings, and `cargo xtask check-deps` passes for the 7 format crates. Setup a fresh Linux machine needs:
   `apt-get install libasound2-dev libudev-dev libwayland-dev libxkbcommon-dev` (pkg-config was present),
@@ -120,6 +120,22 @@ New resource strings, checked by `shipped_mscorlib` on the PC: `IO_PATH_NOT_FOUN
 `ARGUMENT_OUT_OF_RANGE_START_INDEX_LARGER_THAN_LENGTH`, `MISSING_METHOD_NAME`, `ARGUMENT_ADDING_DUPLICATE_WITH_KEY`,
 `ARG_KEY_NOT_FOUND_WITH_KEY`.
 
+### M2f: level info (plan `docs/superpowers/plans/2026-11-02-m2f-level-info.md`)
+
+Written and started in the cloud under the autonomous order, **not reviewed by the owner** (the spec asks for each
+plan's approval; M2c set the precedent). It reads `Level.dat` and `Config.json` as `Level.ReadLevelInfo` does, for
+V23's messages and the level's `Allow_Holiday_Redirects` (V14). It adds the step 1 spec's `pinewatch-binary` and
+`pinewatch-json` (Json.NET 13.0.3, the version the SDK's `Newtonsoft.Json.dll` reports).
+
+| Task | State | What exists |
+|---|---|---|
+| 1 `Block` | Done | `pinewatch-binary::Block` (every reader but `readSingleQuaternion` and `read(Type…)`); `pinewatch_mono::utf8_get_string` (`Encoding.UTF8.GetString`, flushed) |
+| 2 `Level.dat`, packed version | Not started | |
+| 3 to 6 `pinewatch-json` | Not started | Reader, typed reads, `object` values, typed deserialization |
+| 7 `LevelInfoConfigData`, `ReadLevelInfo` | Not started | |
+
+New entry: V30 (`new byte[negative]`'s message).
+
 ### Linux test fixes
 
 The missing-heightmap test expects the `/` form on Linux, and the screenshot test checks an upper-case install path
@@ -148,6 +164,7 @@ only where file systems ignore case. Neither changes production behavior.
 ### 2. In the cloud (no PC needed)
 
 - **M2c is written in full.** What remains of it is the PC run of its install tests (section 1).
+- **M2f tasks 2 to 7** (level info; the plan lists each).
 - Cloud disk is a fixed allowance: if linking the app fails with `signal 7 [Bus error]`, the disk is full of old
   app binaries (about 1.8 GB each); `cargo clean -p pinewatch` frees them.
 - Later plans: M2d (asset processor) and M2e (terrain materials) need Unity on the PC.
@@ -165,7 +182,7 @@ sessions anyway. No dev container exists. `CLAUDE.md` carries his rules into tho
 
 ## Exact next steps
 
-1. **On the Windows PC:** `git fetch`, check out `main-9m65p0`. Run `cargo test --workspace` (expect 520 tests,
+1. **On the Windows PC:** `git fetch`, check out `main-9m65p0`. Run `cargo test --workspace` (expect 533 tests,
    none skipped: the Windows-only test, plus the install tests that skip on Linux run for the first time, among them
    the map walk, `shipped_messages`' assembly half, `shipped_mscorlib` with the five new strings, and the assets
    install test). If the level install test reports `Context "Landscape tile …" missing asset` warnings, look for the
@@ -176,8 +193,9 @@ sessions anyway. No dev container exists. `CLAUDE.md` carries his rules into tho
    on the real game; expect a slower start and the asset system's messages on stderr. Do the V17, V3 and V21 checks
    above and update `docs/VERIFICATION.md`. Then fast-forward `main` and push it.
 2. **M2c is written in full** (tasks 1 to 12), but its install tests have never run: they skip without the game.
-   The PC run in step 1 is their first. The holiday inputs (V14) wait for the level config and the provider. The
-   next plans, M2d (asset processor) and M2e (terrain materials), need Unity on the PC.
+   The PC run in step 1 is their first. **In the cloud:** M2f tasks 2 to 7, test first, one commit per task, after
+   the owner reviews the plan if he wants to. The active holiday (V14) waits for the provider. The next Unity plans,
+   M2d (asset processor) and M2e (terrain materials), need the PC.
 3. **On the PC:** M2b: write its spec and plan, choosing between the Unity Editor in batch mode and the game's own
    Mono runtime for each check, then implement it test first and record what the comparisons show.
 

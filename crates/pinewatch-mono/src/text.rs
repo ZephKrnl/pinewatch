@@ -64,9 +64,20 @@ fn in_range(ch: i32, start: i32, end: i32) -> bool {
     (ch.wrapping_sub(start) as u32) <= (end.wrapping_sub(start) as u32)
 }
 
-/// `UTF8Encoding.GetChars` with a decoder that is never flushed (the slow loop; the fast loop hands every
-/// irregular sequence back to it).
+/// `Encoding.UTF8.GetString(bytes)`: `UTF8Encoding.GetChars` without a decoder, so flushed. A sequence still
+/// incomplete at the end is one fallback, and a byte order mark is the character U+FEFF.
+pub fn utf8_get_string(bytes: &[u8]) -> NetString {
+    decode_utf8_with(bytes, true)
+}
+
+/// `UTF8Encoding.GetChars` with a decoder that is never flushed, as `StreamReader` uses it.
 fn decode_utf8(bytes: &[u8]) -> NetString {
+    decode_utf8_with(bytes, false)
+}
+
+/// `UTF8Encoding.GetChars` (the slow loop; the fast loop hands every irregular sequence back to it). With `flush`, a
+/// pending sequence at the end goes through the fallback, as without a decoder or with `MustFlush`.
+fn decode_utf8_with(bytes: &[u8], flush: bool) -> NetString {
     let mut out = Vec::with_capacity(bytes.len());
     let mut ch: i32 = 0;
     let mut p = 0usize;
@@ -161,7 +172,10 @@ fn decode_utf8(bytes: &[u8]) -> NetString {
         ch = 0;
     }
 
-    // Not flushed: a pending sequence (ch != 0) stays in the decoder.
+    // A pending sequence (ch != 0) stays in an unflushed decoder; flushing falls it back as one sequence.
+    if flush && ch != 0 {
+        out.push(REPLACEMENT);
+    }
     NetString::from_units(out)
 }
 

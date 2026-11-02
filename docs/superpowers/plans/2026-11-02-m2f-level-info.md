@@ -59,7 +59,8 @@ Newtonsoft semantics for the types step 1 reads (`LevelInfoConfigData` and the t
   no BOM handling). `pinewatch_binary::Block` with `pub step: usize`, `pub long_binary_data: bool`,
   `Block::new(prefix: usize, contents: Vec<u8>)`, and `read_string -> NetString`, `read_string_array -> Vec<NetString>`,
   `read_boolean -> bool`, `read_boolean_array -> Result<Vec<bool>, MonoException>`, `read_byte -> u8`,
-  `read_byte_array -> Vec<u8>`, `read_i16`, `read_u16`, `read_i32`, `read_u32`, `read_f32`, `read_i64`, `read_u64`,
+  `read_byte_array -> Result<Vec<u8>, MonoException>` (a negative `int` count throws `OverflowException`, V30),
+  `read_i16`, `read_u16`, `read_i32`, `read_u32`, `read_f32`, `read_i64`, `read_u64`,
   `read_i32_array -> Vec<i32>`, `read_u64_array -> Vec<u64>`, `read_steam_id -> u64`,
   `read_guid -> Result<Guid, MonoException>`, `read_u16_r_vector3 -> Vector3`, `read_single_vector3 -> Vector3`,
   `read_color -> Color`, `get_hash -> [u8; 20]`. Not ported here: `readSingleQuaternion` (Unity's `Quaternion.Euler`,
@@ -90,6 +91,9 @@ Newtonsoft semantics for the types step 1 reads (`LevelInfoConfigData` and the t
 - [ ] **Step 3: Implement** the crate, `utf8_get_string` and the readers, each with `Block.cs`'s bounds check.
 - [ ] **Step 4: Run** the test, then `cargo xtask check-deps`; expect both to pass.
 - [ ] **Step 5: Commit** `pinewatch-binary: the Block reader`.
+
+Done 2026-11-02: as planned, plus a test for a string that ends at the last byte. `readByteArray` with a negative
+`int` count throws `OverflowException` (found while porting; the message is V30).
 
 ### Task 2: `Level.dat` and the packed version
 
