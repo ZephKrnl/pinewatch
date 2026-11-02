@@ -151,8 +151,10 @@ fn missing_heightmap_logs_the_exact_warning_and_keeps_default_heights() {
     let install = InstallRoot::open(&dir).unwrap();
     let mut log = MemoryLog::default();
     let tiles = read_landscape(&install, "T", &mut log).unwrap().unwrap();
+    // Path.Combine joins with the platform separator: `\` on Windows (the reference platform), `/` on Linux.
+    let separator = if cfg!(windows) { "\\" } else { "/" };
     let expected = format!(
-        "LandscapeTile missing heightmap file: {}\\Maps\\T/Landscape/Heightmaps/Tile_0_0_Source.heightmap",
+        "LandscapeTile missing heightmap file: {}{separator}Maps{separator}T/Landscape/Heightmaps/Tile_0_0_Source.heightmap",
         dir.to_string_lossy()
     );
     assert!(log.entries.contains(&(LogLevel::Warn, expected)), "{:?}", log.entries);
