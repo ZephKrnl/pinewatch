@@ -144,8 +144,12 @@ isn't set up. Each entry says what the Rust code does, where the behavior came f
 - **V19. Type names in `.dat` values (gap).** `ParseType` calls `Type.GetType(name, false, ignoreCase: true)`, which
   searches the calling assembly (`UnturnedDat.dll`) and `mscorlib.dll` unless the name says which assembly, and
   matches case-insensitively. Pinewatch asks a `TypeResolver`, and no resolver knows the game's types yet, as in V10.
-  The checks before the lookup (null or empty value, `\`, `:` or `/` in the name) are ported. **Fix:** a type
-  registry built from the shipped assemblies, with `Type.GetType`'s name matching.
+  The checks before the lookup (null or empty value, `\`, `:` or `/` in the name) are ported. `throwOnError: false`
+  doesn't stop every exception: `Type.GetType` still throws some, for example `FileLoadException` for an
+  assembly-qualified name whose assembly is found but can't be loaded, and `ParseType` doesn't catch them. So
+  `TypeResolver::resolve` returns a `Result`, and `parse_type` passes its error on. **Fix:** a type registry built
+  from the shipped assemblies, with `Type.GetType`'s name matching. **Check:** which exceptions Mono's
+  `Type.GetType(name, false, true)` throws for malformed and assembly-qualified names.
 - **V20. Legacy `readBoolean` comparison (gap).** `Data.readBoolean` compares with `"y"` and `"true"` using
   `StringComparison.InvariantCultureIgnoreCase`, a linguistic comparison through Mono's collation tables, which skips
   ignorable characters such as U+00AD (soft hyphen). Pinewatch compares code units ignoring case, so it matches for

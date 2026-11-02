@@ -3,7 +3,7 @@
 //! Each `try_parse_x(key)` is `TryParseX(key, out value)`: `None` unless the key holds a value node that parses.
 //! On failure the C# out value is always the type's default, which is `unwrap_or_default()`.
 
-use pinewatch_mono::{Guid, NetEnum, NetString};
+use pinewatch_mono::{Guid, MonoException, NetEnum, NetString};
 
 use crate::tree::{DictRef, ListRef, ValueRef};
 use crate::types::{TypeHandle, TypeResolver};
@@ -86,10 +86,10 @@ impl<'t> DictRef<'t> {
         key: &str,
         resolver: &dyn TypeResolver,
         default: Option<TypeHandle>,
-    ) -> Option<TypeHandle> {
+    ) -> Result<Option<TypeHandle>, MonoException> {
         match self.try_get_value(key) {
             Some(node) => node.parse_type(resolver, default),
-            None => default,
+            None => Ok(default),
         }
     }
 }

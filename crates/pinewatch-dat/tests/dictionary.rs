@@ -5,7 +5,7 @@ mod common;
 
 use common::{DatTestEnum, DatTestEnumFlags, parse, tree_with_value};
 use pinewatch_dat::{TypeHandle, TypeResolver};
-use pinewatch_mono::{Guid, NetString};
+use pinewatch_mono::{ExceptionKind, Guid, MonoException, NetString};
 
 /// `TryParseInt8`.
 const TRY_PARSE_INT8: &[(&str, bool, i8)] = &[
@@ -419,8 +419,8 @@ fn parse_guid() {
 struct TestResolver;
 
 impl TypeResolver for TestResolver {
-    fn resolve(&self, assembly_qualified_name: &NetString) -> Option<TypeHandle> {
-        handle(&assembly_qualified_name.to_string_lossy())
+    fn resolve(&self, assembly_qualified_name: &NetString) -> Result<Option<TypeHandle>, MonoException> {
+        Ok(handle(&assembly_qualified_name.to_string_lossy()))
     }
 }
 
@@ -437,11 +437,27 @@ fn type_handle(name: Option<&str>) -> Option<TypeHandle> {
     name.map(|name| handle(name).expect("a type the test resolver knows"))
 }
 
+/// A resolver's exception reaches the caller through the dictionary helper too; a missing key gives the default.
+#[test]
+fn parse_type_passes_resolver_exceptions_on() {
+    struct Throws;
+    impl TypeResolver for Throws {
+        fn resolve(&self, _: &NetString) -> Result<Option<TypeHandle>, MonoException> {
+            Err(MonoException::new(ExceptionKind::FileLoad, "Could not load file or assembly 'X'"))
+        }
+    }
+
+    let tree = tree_with_value("T, X");
+    let error = tree.root().parse_type("key", &Throws, None).unwrap_err();
+    assert_eq!(error.kind, ExceptionKind::FileLoad);
+    assert_eq!(Ok(Some(TypeHandle(1))), tree.root().parse_type("missing", &Throws, Some(TypeHandle(1))));
+}
+
 #[test]
 fn parse_type() {
     for &(input, expected_value, default_value) in PARSE_TYPE {
         let tree = tree_with_value(input);
-        let actual_value = tree.root().parse_type("key", &TestResolver, type_handle(default_value));
+        let actual_value = tree.root().parse_type("key", &TestResolver, type_handle(default_value)).unwrap();
         assert_eq!(type_handle(expected_value), actual_value, "for {input:?}");
     }
 }
@@ -481,5 +497,5 @@ fn lookups_check_the_node_type() {
     assert_eq!(None, root.try_parse_int32("missing"));
     assert_eq!(7, root.parse_int32("d", 7));
     assert_eq!(None, root.try_parse_bool("l"));
-    assert_eq!(Some(TypeHandle(1)), root.parse_type("d", &TestResolver, Some(TypeHandle(1))));
+    assert_eq!(Ok(Some(TypeHandle(1))), root.parse_type("d", &TestResolver, Some(TypeHandle(1))));
 }
