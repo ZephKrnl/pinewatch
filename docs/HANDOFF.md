@@ -171,8 +171,10 @@ sessions anyway. No dev container exists. `CLAUDE.md` carries his rules into tho
    install test). If the level install test reports `Context "Landscape tile …" missing asset` warnings, look for the
    same lines in the original game's `Logs/Client.log` after loading that map before changing anything: the game
    warns too when a material is really missing. If a shipped-text test fails, compare with the DLL before changing
-   anything: the port must match it. Run `cargo clippy --workspace --all-targets` and `cargo xtask check-deps`. Do
-   the V17, V3 and V21 checks above and update `docs/VERIFICATION.md`. Then fast-forward `main` and push it.
+   anything: the port must match it. Run `cargo clippy --workspace --all-targets` and `cargo xtask check-deps`. Run
+   the app once (`cargo run -p pinewatch --release`): it now loads every asset before the map, which has never run
+   on the real game; expect a slower start and the asset system's messages on stderr. Do the V17, V3 and V21 checks
+   above and update `docs/VERIFICATION.md`. Then fast-forward `main` and push it.
 2. **M2c is written in full** (tasks 1 to 12), but its install tests have never run: they skip without the game.
    The PC run in step 1 is their first. The holiday inputs (V14) wait for the level config and the provider. The
    next plans, M2d (asset processor) and M2e (terrain materials), need Unity on the PC.
