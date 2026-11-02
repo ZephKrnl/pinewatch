@@ -73,3 +73,45 @@ fn hex_style_is_rejected() {
     let error = try_parse_f32(None, NumberStyles::HEX_NUMBER, &NumberFormat::invariant()).unwrap_err();
     assert_eq!(error.kind, ExceptionKind::Argument);
 }
+
+/// Bits computed outside this crate. A separate big-integer model of corert's `NumberToDouble` (mono/corert
+/// `11136ad5`, `Number.CoreRT.cs`), with the power-of-ten tables read from that upstream file, gave the first
+/// column; the second is the correctly rounded double, for comparison. Rows marked as quirks are where corert's
+/// 18-digit cut, lossy 64-bit products or denormal truncation give another result, and Pinewatch must match corert.
+/// The upstream tables equal the port's, and 54 of their 72 mantissas are not the nearest 64-bit value.
+#[test]
+fn corert_bits_from_an_independent_model() {
+    let cases: [(&str, u64, u64); 27] = [
+        ("-1.79769313486231571982965e-323", 0x8000000000000003, 0x8000000000000004), // corert quirk
+        ("2.4703282292062328e-324", 0x0000000000000001, 0x0000000000000001),
+        ("2.4703282292062327e-324", 0x0000000000000001, 0x0000000000000000), // corert quirk
+        ("4.9406564584124654e-324", 0x0000000000000001, 0x0000000000000001),
+        ("1.7976931348623157e308", 0x7FEFFFFFFFFFFFFF, 0x7FEFFFFFFFFFFFFF),
+        ("1.7976931348623158e308", 0x7FEFFFFFFFFFFFFF, 0x7FEFFFFFFFFFFFFF),
+        ("2.2250738585072011e-308", 0x000FFFFFFFFFFFFF, 0x000FFFFFFFFFFFFF),
+        ("2.2250738585072014e-308", 0x0010000000000000, 0x0010000000000000),
+        ("1e22", 0x4480F0CF064DD592, 0x4480F0CF064DD592),
+        ("1e23", 0x44B52D02C7E14AF6, 0x44B52D02C7E14AF6),
+        ("1e-300", 0x01A56E1FC2F8F359, 0x01A56E1FC2F8F359),
+        ("1.52198088343072251e-199", 0x16A74CCE2EA40D9D, 0x16A74CCE2EA40D9C), // corert quirk
+        ("1.698080779995082121e-181", 0x1A668C41E4492A0E, 0x1A668C41E4492A0D), // corert quirk
+        ("2.5694660560054571941e-192", 0x18277231D0588683, 0x18277231D0588682), // corert quirk
+        ("3.79327207306758575e-64", 0x32C3F95215690711, 0x32C3F95215690710), // corert quirk
+        ("3.334813557226493413068374e243", 0x727F41EF50CE086D, 0x727F41EF50CE086E), // corert quirk
+        ("5.3313689557645818e-310", 0x0000622450812653, 0x0000622450812653),
+        ("5.915331269190496061e-311", 0x00000AE3A0550169, 0x00000AE3A0550169),
+        ("1.337976705174450561e-318", 0x00000000000421D9, 0x00000000000421DA), // corert quirk
+        ("8.59587355437390701e-314", 0x000000040D0419E5, 0x000000040D0419E6), // corert quirk
+        ("4.27183398762473289151e-314", 0x00000002035BE378, 0x00000002035BE379), // corert quirk
+        ("3.662499891092985481e-313", 0x00000011427B555D, 0x00000011427B555E), // corert quirk
+        ("7.71606887260498752319e-319", 0x000000000002620E, 0x000000000002620F), // corert quirk
+        ("3.1389778496102898599e-317", 0x000000000060F1D1, 0x000000000060F1D2), // corert quirk
+        ("9.8391108377283657937030595786506971726e-320", 0x0000000000004DCA, 0x0000000000004DCB), // corert quirk
+        ("9.621603689739286979538e-264", 0x095363E8270AF601, 0x095363E8270AF601),
+        ("8.517072558626137644044124247e194", 0x686755B21D8A74B9, 0x686755B21D8A74B9),
+    ];
+    for (text, corert, correctly_rounded) in cases {
+        let parsed = f64_any(text).map(f64::to_bits);
+        assert_eq!(parsed, Some(corert), "{text} (correctly rounded: {correctly_rounded:#018x})");
+    }
+}

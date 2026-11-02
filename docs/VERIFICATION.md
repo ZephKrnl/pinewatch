@@ -95,6 +95,9 @@ isn't set up. Each entry says what the Rust code does, where the behavior came f
   `Double.TryParse` over corert's `TryParseSingle`, `TryParseDouble` and the portable `NumberToDouble`
   (`Number.CoreRT.cs`), which the shipped IL has as managed code. Only the first 18 significant digits count, the
   value is rounded once to 53 bits, and `float` is the cast of that `double`. NaN has the C# constants' bits.
+  On 2026-11-02 the port's power-of-ten tables were compared with upstream `Number.CoreRT.cs` at `11136ad5` (equal),
+  and a separate big-integer model of that file agreed with the port on 20,000 generated decimals;
+  `corert_bits_from_an_independent_model` pins 27 of them, 14 where corert differs from correct rounding.
   **Check:** a harness sweep of generated decimals near rounding boundaries, long digit strings and denormals.
 
 ## `pinewatch-kvt`
