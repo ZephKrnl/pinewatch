@@ -4466,6 +4466,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "pinewatch-assets"
+version = "0.1.0"
+dependencies = [
+ "pinewatch-dat",
+ "pinewatch-io",
+ "pinewatch-mono",
+ "sha1",
+]
+
+[[package]]
 name = "pinewatch-dat"
 version = "0.1.0"
 dependencies = [
@@ -4478,6 +4488,7 @@ dependencies = [
 name = "pinewatch-io"
 version = "0.1.0"
 dependencies = [
+ "pinewatch-mono",
  "windows-sys 0.61.2",
 ]
 

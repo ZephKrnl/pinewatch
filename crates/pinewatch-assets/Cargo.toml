@@ -1,0 +1,13 @@
+[package]
+name = "pinewatch-assets"
+description = "Finds, reads and indexes the original game's asset definitions"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+pinewatch-dat.workspace = true
+pinewatch-io.workspace = true
+pinewatch-mono.workspace = true
+sha1.workspace = true

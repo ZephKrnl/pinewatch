@@ -101,3 +101,16 @@ fn real_install_has_pei() {
     };
     assert!(install.exists("Maps/PEI/Level.dat"));
 }
+
+/// `full_name` is `UnturnedPaths.RootDirectory.FullName`: absolute, `.` and `..` resolved, no trailing separator,
+/// built with the platform's `Path` rules (V11).
+#[test]
+fn full_name_is_the_mono_root_directory() {
+    let dir = temp_dir("full-name");
+    let name = dir.file_name().unwrap().to_str().unwrap().to_string();
+    let detour = dir.join("..").join(&name).join(".");
+    let install = InstallRoot::open(&detour).unwrap();
+    let expected = dir.to_str().unwrap().to_string();
+    assert_eq!(install.full_name(), expected);
+    assert!(!install.full_name().contains(".."));
+}

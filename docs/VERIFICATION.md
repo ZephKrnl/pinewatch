@@ -110,6 +110,17 @@ isn't set up. Each entry says what the Rust code does, where the behavior came f
   `corert_bits_from_an_independent_model` pins 27 of them, 14 where corert differs from correct rounding.
   **Check:** a harness sweep of generated decimals near rounding boundaries, long digit strings and denormals.
 
+## `pinewatch-io`
+
+- **V22. Mono's `Path` (gap for rare forms).** Unity's Mono compiles its own `System.IO/Path.cs`, not corefx's.
+  `pinewatch_io::mono_path` ports `Combine`, `GetFileName`, `GetDirectoryName` (with `CleanPath`),
+  `GetFileNameWithoutExtension`, `ChangeExtension(path, null)`, `GetPathRoot` and `GetFullPath` (`InsecureGetFullPath`,
+  `WindowsDriveAdjustment`, `CanonicalizePath`, `SameRoot`) for both platforms. Not ported: `MonoIO.RemapPath`
+  (`MONO_IOMAP`, off by default); the `GetFullPathName` calls for a drive-relative path on another drive than the
+  current directory (`D:dir` while in `C:`), which return the path unchanged here; `char.IsLetter` for a non-ASCII
+  drive letter; and the culture-aware `String.Compare` of UNC server names in `SameRoot`, compared ordinally ignoring
+  case here. **Check:** a harness sweep of `Path` calls on generated paths, including these forms.
+
 ## `pinewatch-kvt`
 
 - **V9. Hierarchy hash (later step).** `LevelHierarchy.load` hashes the bytes its `StreamReader` pulled through
@@ -128,10 +139,12 @@ isn't set up. Each entry says what the Rust code does, where the behavior came f
   against a real `Level.hierarchy` written by the shipped game. **Fix:** a registry of the game's hierarchy item
   types (devkit objects step), with `Type.GetType`'s name matching.
 - **V11. Level path string.** Messages use `<install root with \ separators, no trailing \>\Maps\<folder>`, followed by
-  `/Landscape/...`, as `Path.Combine` and `Directory.GetDirectories` build it. The root is `DirectoryInfo.FullName`:
-  Pinewatch makes the install path absolute and resolves `.` and `..` the way `Path.GetFullPath` does
-  (`GetFullPathNameW` on Windows). **Check:** the root string Unity reports
-  (`UnturnedPaths.RootDirectory.FullName`), including letter case and 8.3 short names.
+  `/Landscape/...`, as `Path.Combine` and `Directory.GetDirectories` build it. The root is
+  `UnturnedPaths.RootDirectory.FullName`, Unity's `new DirectoryInfo(Application.dataPath).Parent`: since
+  2026-11-02, `InstallRoot::full_name` computes it with Mono's own `Path.GetFullPath` (ported in
+  `pinewatch_io::mono_path`, V22) from `<install>/Unturned_Data`, where M1 used `GetFullPathNameW`. **Check:** the
+  root string Unity reports, including letter case and 8.3 short names (`Application.dataPath` comes from Unity's
+  native code).
 - **V12. I/O exception messages (gap).** A file that exists but fails to read becomes an `IOException` carrying Rust's
   error text, not Mono's. **Fix:** map OS error codes to Mono's exception types and messages.
 - **V13. Culture-formatted numbers in messages (gap).** `LandscapeCoord.ToString()` and `UnturnedLog`'s

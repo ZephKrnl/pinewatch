@@ -4,6 +4,7 @@
 use std::fmt;
 use std::io;
 
+use pinewatch_io::mono_path::{self, PathStyle};
 use pinewatch_io::{InstallRoot, LogLevel, LogSink};
 use pinewatch_kvt::{KvtCursor, read_kvt_bytes};
 use pinewatch_mono::{ExceptionKind, Guid, MonoException};
@@ -151,38 +152,13 @@ impl MapPaths {
     }
 }
 
-#[cfg(windows)]
+/// `Path.Combine(PathEx.Join(RootDirectory, "Maps"))` and the folder that `Directory.GetDirectories` appends.
 fn level_path_string(install: &InstallRoot, folder: &str) -> String {
-    // GetFullPathNameW, as Path.GetFullPath uses it. It only fails for an empty path, which an open install isn't.
-    let full = std::path::absolute(install.root()).unwrap_or_else(|_| install.root().to_path_buf());
-    let mut root = full.to_string_lossy().replace('/', "\\");
-    while root.len() > 3 && root.ends_with('\\') {
-        root.pop();
-    }
-    let maps = if root.ends_with('\\') { format!("{root}Maps") } else { format!("{root}\\Maps") };
-    format!("{maps}\\{folder}")
-}
-
-#[cfg(not(windows))]
-fn level_path_string(install: &InstallRoot, folder: &str) -> String {
-    // Path.GetFullPath on Unix: absolute, then `.` and `..` resolved lexically.
-    let absolute = std::path::absolute(install.root()).unwrap_or_else(|_| install.root().to_path_buf());
-    let mut full = std::path::PathBuf::new();
-    for part in absolute.components() {
-        match part {
-            std::path::Component::ParentDir => {
-                full.pop();
-            }
-            std::path::Component::CurDir => {}
-            other => full.push(other),
-        }
-    }
-    let mut root = full.to_string_lossy().into_owned();
-    while root.len() > 1 && root.ends_with('/') {
-        root.pop();
-    }
-    let maps = if root.ends_with('/') { format!("{root}Maps") } else { format!("{root}/Maps") };
-    format!("{maps}/{folder}")
+    let separator = PathStyle::HOST.separator();
+    // "Maps" never has an invalid character, and the root was checked when the install was opened.
+    let maps = mono_path::combine(PathStyle::HOST, install.full_name(), "Maps")
+        .unwrap_or_else(|_| format!("{}{separator}Maps", install.full_name()));
+    format!("{maps}{separator}{folder}")
 }
 
 fn io_exception(error: io::Error) -> MonoException {

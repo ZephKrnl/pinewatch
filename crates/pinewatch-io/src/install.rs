@@ -4,6 +4,7 @@ use std::fs;
 use std::io::{self, Read};
 use std::path::{Path, PathBuf};
 
+use crate::mono_path::{self, PathStyle};
 use crate::steam;
 
 /// Environment variable that points at the original game's install folder.
@@ -15,20 +16,31 @@ pub const INSTALL_DIR_ENV: &str = "PINEWATCH_UNTURNED_DIR";
 #[derive(Debug, Clone)]
 pub struct InstallRoot {
     root: PathBuf,
+    full_name: String,
 }
 
 impl InstallRoot {
-    /// Opens an existing directory as the install root.
+    /// Opens an existing directory as the install root. A folder whose path Mono's `Path` refuses (an invalid
+    /// character) is refused too.
     pub fn open(path: impl AsRef<Path>) -> io::Result<Self> {
         let root = path.as_ref().to_path_buf();
         if !fs::metadata(&root)?.is_dir() {
             return Err(io::Error::new(io::ErrorKind::InvalidInput, format!("{} is not a folder", root.display())));
         }
-        Ok(Self { root })
+        // The current directory only matters for a relative path.
+        let cwd = std::env::current_dir().map(|dir| dir.to_string_lossy().into_owned()).unwrap_or_default();
+        let full_name = mono_path::root_full_name(PathStyle::HOST, &root.to_string_lossy(), &cwd)
+            .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.message))?;
+        Ok(Self { root, full_name })
     }
 
     pub fn root(&self) -> &Path {
         &self.root
+    }
+
+    /// `UnturnedPaths.RootDirectory.FullName` (`ReadWrite.PATH`): the install folder as the game's messages show it.
+    pub fn full_name(&self) -> &str {
+        &self.full_name
     }
 
     /// Turns a path relative to the install (using `/` or `\`) into an OS path.

@@ -2,6 +2,7 @@
 
 mod install;
 mod log;
+pub mod mono_path;
 pub mod steam;
 
 pub use install::{InstallNotFound, InstallRoot, find_install};

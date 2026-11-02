@@ -24,6 +24,7 @@ Ported from `mono/corefx` at `5b4edb9b0a721aed60c9c8ddeed441bdd7451e42` and `mon
 | `crates/pinewatch-mono/src/boolean.rs` | corefx `Boolean.cs` (`TryParse`, `TrimWhiteSpaceAndNull`) |
 | `crates/pinewatch-mono/src/sr.rs` | corefx resource strings, as Mono's `mcs/class/corlib/corefx/SR.cs` carries them |
 | `crates/pinewatch-unity/src/lib.rs` | corefx `src/Common/src/CoreLib/System/Single.cs` (`Equals(float)`) |
+| `crates/pinewatch-io/src/mono_path.rs` | corefx `src/System.IO.FileSystem/src/System/IO/DirectoryInfo.cs` (`Parent`) |
 | `crates/pinewatch-dat/src/unity_ex.rs` | corefx `src/Common/src/CoreLib/System/String.Searching.cs` (the `startIndex` check of `IndexOf(char, int, int)`) |
 
 ```
@@ -89,13 +90,24 @@ SOFTWARE.
 
 ## Mono class libraries
 
-Ported from `mcs/class/corlib` in Unity's Mono at `b8eb56fab45dd52845fabba7b7ddc9a80b2b0498`. The source file has no
-copyright line of its own; Mono's `LICENSE` puts the class libraries under the MIT license below.
+Ported from `mcs/class/corlib` in Unity's Mono at `b8eb56fab45dd52845fabba7b7ddc9a80b2b0498`. Mono's `LICENSE` puts the
+class libraries under the MIT license below.
 
 | Rust file | Ported from |
 |---|---|
 | `crates/pinewatch-mono/src/case_tables.rs` | `TextInfoToUpperData`, `TextInfoToLowerData`, `ToUpperInternal(char)` and `ToLowerInternal(char)` in `ReferenceSources/TextInfo.cs` |
 | `crates/pinewatch-mono/src/chars.rs` | the same `ToUpperInternal(char)` and `ToLowerInternal(char)` |
+| `crates/pinewatch-io/src/mono_path.rs` | `Combine`, `GetFileName`, `GetDirectoryName`, `CleanPath`, `GetPathRoot`, `ChangeExtension`, `GetFileNameWithoutExtension`, `GetFullPath` and its helpers in `System.IO/Path.cs` |
+
+`ReferenceSources/TextInfo.cs` has no copyright line of its own. `System.IO/Path.cs` carries these:
+
+```
+Copyright (C) 2001 Moonlight Enterprises, All Rights Reserved
+Copyright (C) 2002 Ximian, Inc. (http://www.ximian.com)
+Copyright (C) 2003 Ben Maurer
+Copyright 2011 Xamarin Inc (http://www.xamarin.com).
+Copyright (C) 2004-2005 Novell, Inc (http://www.novell.com)
+```
 
 ```
 Permission is hereby granted, free of charge, to any person obtaining
