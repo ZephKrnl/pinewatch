@@ -66,8 +66,10 @@ Tests that read the real game files run when an install is found and are skipped
 |---|---|
 | `crates/` | Pinewatch's Rust crates |
 | `docs/` | Architecture, survey, format inventory, specs and plans |
+| `docs/HANDOFF.md` | Where the work stands, what is unfinished, and the next steps |
 | `COMPATIBILITY.md` | The 1:1 compatibility rules and every known limitation |
 | `NOTICES-PORTED-CODE.md` | License notices for the ported .NET class-library code |
 | `reference/u3-sdk` | The U3 SDK source, pinned to tag `v3.26.3.12` (reference only, never edited) |
 
-This repository is local and private. Git is used for version control only; nothing is pushed anywhere.
+This repository is private. Besides the working copy on the developer's PC, it lives only in a private GitHub
+repository, and is never published.
