@@ -9,6 +9,10 @@ use crate::sr;
 /// and `"\n"` elsewhere. `ArgumentException.Message` puts it before the `Parameter name:` line.
 pub const NEW_LINE: &str = if cfg!(windows) { "\r\n" } else { "\n" };
 
+/// The message of the `NullReferenceException` the runtime raises for dereferencing null: a C string in the game's
+/// native runtime (`MonoBleedingEdge/EmbedRuntime/mono-2.0-bdwgc.dll`), not an `mscorlib.dll` resource.
+pub const RUNTIME_NULL_REFERENCE: &str = "Object reference not set to an instance of an object";
+
 /// The .NET exception types that ported code can raise.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ExceptionKind {
@@ -24,6 +28,10 @@ pub enum ExceptionKind {
     Format,
     IndexOutOfRange,
     InvalidCast,
+    /// `Newtonsoft.Json.JsonReaderException`.
+    JsonReader,
+    /// `Newtonsoft.Json.JsonSerializationException`.
+    JsonSerialization,
     /// `System.Collections.Generic.KeyNotFoundException`.
     KeyNotFound,
     /// `System.MissingMethodException`.
@@ -47,6 +55,8 @@ impl ExceptionKind {
             Self::Format => "System.FormatException",
             Self::IndexOutOfRange => "System.IndexOutOfRangeException",
             Self::InvalidCast => "System.InvalidCastException",
+            Self::JsonReader => "Newtonsoft.Json.JsonReaderException",
+            Self::JsonSerialization => "Newtonsoft.Json.JsonSerializationException",
             Self::KeyNotFound => "System.Collections.Generic.KeyNotFoundException",
             Self::MissingMethod => "System.MissingMethodException",
             Self::Io => "System.IO.IOException",
@@ -107,10 +117,11 @@ impl MonoException {
         Self::new(ExceptionKind::Argument, with_param_name(message, param_name))
     }
 
-    /// What the runtime throws for dereferencing null. Mono creates runtime exceptions with their default
-    /// constructor (`mono_exception_from_name`), so this is `new NullReferenceException()`.
+    /// What the runtime throws for dereferencing null (a call, a field, an array, `throw null`, unboxing null). The
+    /// runtime gives it its own text, a C string in the game's `mono-2.0-bdwgc.dll` without the final period of
+    /// `new NullReferenceException()`'s resource string ([`sr::ARG_NULL_REFERENCE_EXCEPTION`]).
     pub fn null_reference() -> Self {
-        Self::new(ExceptionKind::NullReference, sr::ARG_NULL_REFERENCE_EXCEPTION)
+        Self::new(ExceptionKind::NullReference, RUNTIME_NULL_REFERENCE)
     }
 
     /// What the runtime throws for a failed cast or unboxing: `new InvalidCastException()`.
@@ -118,9 +129,16 @@ impl MonoException {
         Self::new(ExceptionKind::InvalidCast, sr::ARG_INVALID_CAST_EXCEPTION)
     }
 
-    /// `new OverflowException()`.
+    /// `new OverflowException()`, which is also what the runtime throws for checked arithmetic and conversions.
     pub fn overflow() -> Self {
         Self::new(ExceptionKind::Overflow, sr::ARG_OVERFLOW_EXCEPTION)
+    }
+
+    /// What `new T[n]` throws for a negative `int` size on the game's x64 runtime: an `OverflowException` with an
+    /// empty message (the array allocation's own error). Unity's 32-bit Editor runtime gives the default message
+    /// instead, so this was checked on the game's runtime (V30).
+    pub fn negative_array_size() -> Self {
+        Self::new(ExceptionKind::Overflow, "")
     }
 
     /// What an array indexer, or a span indexer, throws when out of range: `new IndexOutOfRangeException()`.

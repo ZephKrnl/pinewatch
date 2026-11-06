@@ -88,12 +88,27 @@ fn friendly_type_names() {
 #[test]
 fn every_class_is_listed_once_and_abstract_ones_are_marked() {
     let names: Vec<&str> = AssetType::all().map(AssetType::name).collect();
-    assert_eq!(names.len(), 95);
-    let mut sorted = names.clone();
-    sorted.dedup();
-    assert_eq!(sorted.len(), names.len());
+    assert_eq!(names.len(), 96);
+    assert!(names.windows(2).all(|pair| pair[0] < pair[1]), "not sorted by name, or listed twice");
     assert!(AssetType::by_name("FoliageInfoAsset").unwrap().is_abstract());
     assert!(!AssetType::by_name("ItemGunAsset").unwrap().is_abstract());
+}
+
+/// `WeatherAsset` is declared `public class /*Custom*/WeatherAsset : WeatherAssetBase`, the comment between
+/// `class` and the name. The shipped weather assets name it with the full assembly name.
+#[test]
+fn weather_asset() {
+    let name = "SDG.Unturned.WeatherAsset, Assembly-CSharp, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null";
+    let weather = resolve_type_name(name).expect("WeatherAsset doesn't resolve");
+    assert_eq!(weather.full_name(), "SDG.Unturned.WeatherAsset");
+    assert_eq!(weather.category(), EAssetType::None);
+    assert!(!weather.is_abstract());
+    assert!(!weather.is_item());
+    assert_eq!(weather.friendly_type_name(), "Weather");
+
+    let base = AssetType::by_name("WeatherAssetBase").unwrap();
+    assert_eq!(base.friendly_type_name(), "Weather Asset Base");
+    assert_ne!(base, weather);
 }
 
 #[test]

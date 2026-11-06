@@ -78,7 +78,8 @@ fn hex_style_is_rejected() {
 /// `11136ad5`, `Number.CoreRT.cs`), with the power-of-ten tables read from that upstream file, gave the first
 /// column; the second is the correctly rounded double, for comparison. Rows marked as quirks are where corert's
 /// 18-digit cut, lossy 64-bit products or denormal truncation give another result, and Pinewatch must match corert.
-/// The upstream tables equal the port's, and 54 of their 72 mantissas are not the nearest 64-bit value.
+/// The upstream tables equal the port's, and 54 of their 72 mantissas are not the nearest 64-bit value. The shipped
+/// class library gives the same first column (`corert_bits_from_the_shipped_class_library`).
 #[test]
 fn corert_bits_from_an_independent_model() {
     let cases: [(&str, u64, u64); 27] = [
@@ -114,4 +115,33 @@ fn corert_bits_from_an_independent_model() {
         let parsed = f64_any(text).map(f64::to_bits);
         assert_eq!(parsed, Some(corert), "{text} (correctly rounded: {correctly_rounded:#018x})");
     }
+}
+
+/// Bits from the class library the game runs: `double.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture)`
+/// with the shipped `Unturned_Data/Managed/mscorlib.dll`, run on the Windows PC by the Mono of the Unity 2022.3.62f3
+/// Editor (2026-11-03). The second column is the correctly rounded double, for comparison; rows marked as quirks are
+/// where corert gives another result. The same run gave every row of `corert_bits_from_an_independent_model`.
+#[test]
+fn corert_bits_from_the_shipped_class_library() {
+    let cases: [(&str, u64, u64); 13] = [
+        ("-1.79769313486231571982965e-323", 0x8000000000000003, 0x8000000000000004), // corert quirk
+        ("2.4703282292062328e-324", 0x0000000000000001, 0x0000000000000001),
+        ("2.4703282292062327e-324", 0x0000000000000001, 0x0000000000000000), // corert quirk
+        ("1.2345678901234567890123456789e-320", 0x00000000000009C2, 0x00000000000009C3), // corert quirk
+        ("1.7976931348623157e308", 0x7FEFFFFFFFFFFFFF, 0x7FEFFFFFFFFFFFFF),
+        ("1.7976931348623158e308", 0x7FEFFFFFFFFFFFFF, 0x7FEFFFFFFFFFFFFF),
+        ("2.2250738585072014e-308", 0x0010000000000000, 0x0010000000000000),
+        ("2.2250738585072011e-308", 0x000FFFFFFFFFFFFF, 0x000FFFFFFFFFFFFF),
+        ("4.9406564584124654e-324", 0x0000000000000001, 0x0000000000000001),
+        ("-4.9406564584124654e-324", 0x8000000000000001, 0x8000000000000001),
+        ("1e-323", 0x0000000000000002, 0x0000000000000002),
+        ("3e-324", 0x0000000000000001, 0x0000000000000001),
+        ("5e-324", 0x0000000000000001, 0x0000000000000001),
+    ];
+    for (text, corert, correctly_rounded) in cases {
+        let parsed = f64_any(text).map(f64::to_bits);
+        assert_eq!(parsed, Some(corert), "{text} (correctly rounded: {correctly_rounded:#018x})");
+    }
+    // Past the largest double's rounding midpoint `TryParse` fails, where a correctly rounded parse gives infinity.
+    assert_eq!(f64_any("1.7976931348623159e308"), None);
 }

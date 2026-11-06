@@ -20,7 +20,7 @@ const fn info(
 }
 
 /// The asset classes, sorted by name. `RedirectorAsset`'s category comes from its data (`AssetCategory`).
-pub(super) const ASSET_TYPES: [AssetTypeInfo; 95] = [
+pub(super) const ASSET_TYPES: [AssetTypeInfo; 96] = [
     info(UNTURNED, "AirdropAsset", None, false, false, Base),
     info(UNTURNED, "AnimalAsset", Animal, false, false, Localized),
     info(UNTURNED, "CraftingAsset", None, false, false, Base),
@@ -114,6 +114,7 @@ pub(super) const ASSET_TYPES: [AssetTypeInfo; 95] = [
     info(UNTURNED, "VehiclePhysicsProfileAsset", None, false, false, Base),
     info(UNTURNED, "VehicleRedirectorAsset", Vehicle, false, false, Base),
     info(UNTURNED, "VendorAsset", Npc, false, false, Vendor),
+    info(UNTURNED, "WeatherAsset", None, false, false, Base),
     info(UNTURNED, "WeatherAssetBase", None, false, false, Base),
     info(UNTURNED, "ZombieDifficultyAsset", None, false, false, Base),
 ];

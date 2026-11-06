@@ -28,7 +28,11 @@ Newtonsoft semantics for the types step 1 reads (`LevelInfoConfigData` and the t
 - Tests first; one commit per task, authored `Zeph <205350396+ZephKrnl@users.noreply.github.com>`, no AI attribution.
 - Ported third-party code goes in `NOTICES-PORTED-CODE.md`: Json.NET 13.0.3, commit
   `0a2e291c0d9c0c7675d445703e51750363a549ef` (the version the SDK's `Assets/Plugins/Json.NET/Newtonsoft.Json.dll`
-  reports), MIT license.
+  reports), MIT license. The game ships that release's .NET 4.5 build, so port with the `net45` `DefineConstants` of
+  `Src/Newtonsoft.Json/Newtonsoft.Json.csproj`: `HAVE_BIG_INTEGER`, `HAVE_DATE_TIME_OFFSET` and `HAVE_TIME_ZONE_INFO`
+  are defined, `HAVE_DATE_ONLY` is not (checked 2026-11-05).
+- Behavior is checked against the shipped `Newtonsoft.Json.dll`: `reference/checks/jsontokens.cs` writes the reader's
+  expected output for `crates/pinewatch-json/tests/fixtures/reader-corpus.txt` (task 3); later tasks add cases.
 - New crates join `FORMAT_CRATES` in `xtask/src/main.rs`; `cargo xtask check-deps` must still pass (only `sha1`, `png`,
   `windows-sys` from outside the workspace).
 - Lines stay within 120 columns; `cargo clippy --workspace --all-targets` gives no warnings.

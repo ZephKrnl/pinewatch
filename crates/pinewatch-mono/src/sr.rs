@@ -35,6 +35,12 @@ pub const ARGUMENT_OUT_OF_RANGE_START_INDEX_LARGER_THAN_LENGTH: &str =
     "startIndex cannot be larger than length of string.";
 pub const ARGUMENT_OUT_OF_RANGE_INDEX: &str =
     "Index was out of range. Must be non-negative and less than the size of the collection.";
+/// `SR.ArgumentOutOfRange_DateArithmetic`, from `DateTime.AddTicks` (and so `AddDays`).
+pub const ARGUMENT_OUT_OF_RANGE_DATE_ARITHMETIC: &str =
+    "The added or subtracted value results in an un-representable DateTime.";
+/// `SR.ArgumentOutOfRange_DateTimeBadTicks`, from the `DateTime(long ticks, DateTimeKind kind)` constructor.
+pub const ARGUMENT_OUT_OF_RANGE_DATE_TIME_BAD_TICKS: &str =
+    "Ticks must be between DateTime.MinValue.Ticks and DateTime.MaxValue.Ticks.";
 pub const FORMAT_EMPTY_INPUT_STRING: &str = "Input string was either empty or contained only whitespace.";
 pub const FORMAT_EXTRA_JUNK_AT_END: &str = "Additional non-parsable characters are at the end of the string.";
 pub const FORMAT_GUID_BRACE: &str = "Expected {0xdddddddd, etc}.";
@@ -83,6 +89,8 @@ pub const ALL: &[&str] = &[
     ARGUMENT_NULL_GENERIC,
     ARGUMENT_OUT_OF_RANGE_START_INDEX_LARGER_THAN_LENGTH,
     ARGUMENT_OUT_OF_RANGE_INDEX,
+    ARGUMENT_OUT_OF_RANGE_DATE_ARITHMETIC,
+    ARGUMENT_OUT_OF_RANGE_DATE_TIME_BAD_TICKS,
     FORMAT_EMPTY_INPUT_STRING,
     FORMAT_EXTRA_JUNK_AT_END,
     FORMAT_GUID_BRACE,

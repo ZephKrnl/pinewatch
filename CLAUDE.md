@@ -1,7 +1,9 @@
 # Pinewatch: instructions for Claude
 
-Pinewatch is a strict 1:1 Rust port of Unturned (U3 SDK v3.26.3.12). Read `docs/HANDOFF.md` first: it says where
-the work stands, what is unfinished, and the exact next steps.
+Pinewatch is a strict 1:1 Rust port of Unturned (U3 SDK v3.26.3.12). Start every session from `docs/RECOVERY.md`:
+it says where the work stands, what is in progress, which agent owns what, and the next actions. Resume from it
+instead of rediscovering the project, and update it after every significant task. `docs/HANDOFF.md` has the
+background and the decisions.
 
 ## The owner's standing rules
 
@@ -37,3 +39,17 @@ the work stands, what is unfinished, and the exact next steps.
     install `clippy` and run `cargo fetch` first: `cargo xtask check-deps` runs `cargo tree --target all --offline`.
 - **After cloning,** run `git submodule update --init`. On Windows, turn on long paths first (see
   `docs/HANDOFF.md`).
+
+## graphify
+
+Graphify is optional in cloud sessions. If the executable or graph is absent, skip graph operations and use
+text searches plus the relevant test suite. Machine-local hooks and installed skills are not committed.
+
+This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
+
+Rules:
+- When graphify-out/graph.json exists, run `graphify query "<question>"` before your first grep, search or source-file read for a codebase question, and put this rule in every subagent prompt that explores code. Read raw files only for lines the graph or an earlier read already located. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
+- If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
+- Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
+- After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).
+- `graphify-out/` is ignored and rebuilt locally. Do not commit generated graphs or local hook settings.

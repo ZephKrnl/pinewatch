@@ -93,6 +93,13 @@ fn unturned_dat_messages() -> Vec<Message> {
         Message { text: "dictionary with 0 item(s)".into(), args: vec!["0"] },
         // `$"\"{value.Value}\""`: one string hole, so `string.Concat` with the piece `"`.
         Message { text: "\"Old\"".into(), args: vec!["Old"] },
+        // A flag's value is null, described as `value(null)`. The flag is stored once the next line is read.
+        parser_message(
+            "Key \"Old\"\nKey\nNext v",
+            "duplicate key \"Key\" on line 3 replacing existing value \"Old\" with value(null)",
+            &["Key", "3", "\"Old\"", "value(null)"],
+        ),
+        Message { text: "value(null)".into(), args: vec![] },
     ]
 }
 

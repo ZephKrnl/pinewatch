@@ -1,0 +1,10 @@
+[package]
+name = "pinewatch-json"
+description = "Json.NET's JsonTextReader and the deserialization the original game uses, ported (M2f)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+pinewatch-mono.workspace = true

@@ -54,42 +54,6 @@ isn't set up. Each entry says what the Rust code does, where the behavior came f
 
 ## `pinewatch-mono`
 
-- **V2. Exception messages.** The texts below come from the shipped constructors and `ArgumentException.Message`
-  (IL-checked). `Environment.NewLine` is `"\r\n"` on Windows (Mono's `mono_icall_get_new_line`).
-
-  | Exception | Message |
-  |---|---|
-  | `NullReferenceException` | `Object reference not set to an instance of an object.` |
-  | `InvalidCastException` | `Specified cast is not valid.` |
-  | `OverflowException()` | `Arithmetic operation resulted in an overflow.` |
-  | `IndexOutOfRangeException` | `Index was outside the bounds of the array.` |
-  | `ArgumentOutOfRangeException(p)` | `Specified argument was out of the range of valid values.` + NewLine + `Parameter name: p` |
-  | `ArgumentNullException(p)` | `Value cannot be null.` + NewLine + `Parameter name: p` |
-  | `ArgumentException(message, p)` | the message + NewLine + `Parameter name: p`; nothing is added for a null or empty `p` |
-
-  **Check:** two runtime behaviors come from Mono's C source, not the shipped IL:
-  - A null dereference and a failed cast make the runtime create the exception with its default constructor
-    (`mono_exception_from_name` in `exception.c`).
-  - `Environment.NewLine` is `"\r\n"` on Windows.
-- **V3. Unicode tables.** Ported from source on 2026-11-02; before, Pinewatch used Rust's Unicode tables.
-  - `IsWhiteSpace` is corefx's `IsWhiteSpaceLatin1` up to U+00FF, then the space, line and paragraph separator
-    categories of corefx `CharUnicodeInfoData`: 17 code units, listed in `chars.rs`. Rust's `White_Space` property
-    gave the same set.
-  - `ToUpperInvariant` and `ToLowerInvariant` are `CultureInfo.InvariantCulture.TextInfo.ToUpper` and `ToLower`
-    (reference source `textinfo.cs`, `MONO` branch): ASCII directly, everything else from Mono's
-    `TextInfoToUpperData` and `TextInfoToLowerData` (`mcs/class/corlib/ReferenceSources/TextInfo.cs`). For the
-    invariant culture Mono skips its culture special cases, so `µ`, `ı`, `ſ`, `ǅ`, `ς`, `ẞ` and the ohm, Kelvin and
-    Ångström signs, among others, stay unchanged. Rust's mappings differed for 252 code units (upper case) and 207
-    (lower case). The tests in `crates/pinewatch-mono/tests/chars.rs` pin checksums of all 65,536 mappings, computed
-    from the C# source.
-  - These tables decide GUID text (trimming, the hex-digit check, the `x` of a hex prefix), which characters end an
-    unquoted `.dat` key or count as blank between tokens (for example U+2028 or U+3000), `.dat` key matching (V17),
-    the trimming and ignore-case match in `Boolean.TryParse`, the trimming and ignore-case name match in
-    `Enum.TryParse`, the trimming around the `float` and `double` special symbols, and the legacy `readBoolean`
-    (V20).
-
-  **Check:** that the shipped `mscorlib.dll` holds the same `TextInfoToUpperData`, `TextInfoToLowerData` and
-  `CharUnicodeInfoData` (Unity publishes no exact build commit, V0), or a harness dump of all 65,536 code units.
 - **V4. UTF-8 decoding.** Ported from corefx `UTF8Encoding.GetChars`, the slow loop, which the fast loop hands every
   irregular sequence to. Each fallback is one U+FFFD. These lead bytes are invalid on their own: `80`–`BF`, `C0`,
   `C1` and `F5`–`FF`. An interrupted sequence is one fallback, and the interrupting byte is read again. A bad
@@ -107,7 +71,10 @@ isn't set up. Each entry says what the Rust code does, where the behavior came f
   value is rounded once to 53 bits, and `float` is the cast of that `double`. NaN has the C# constants' bits.
   On 2026-11-02 the port's power-of-ten tables were compared with upstream `Number.CoreRT.cs` at `11136ad5` (equal),
   and a separate big-integer model of that file agreed with the port on 20,000 generated decimals;
-  `corert_bits_from_an_independent_model` pins 27 of them, 14 where corert differs from correct rounding.
+  `corert_bits_from_an_independent_model` pins 27 of them, 14 where corert differs from correct rounding. On
+  2026-11-03 the game's shipped `mscorlib.dll`, run by the Mono of the Unity 2022.3.62f3 Editor, gave the same bits
+  for those 27 and for the 13 decimals `corert_bits_from_the_shipped_class_library` pins (3 of them quirks), and
+  failed `1.7976931348623159e308` as an overflow (`double.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture)`).
   **Check:** a harness sweep of generated decimals near rounding boundaries, long digit strings and denormals.
 
 ## `pinewatch-io`
@@ -123,15 +90,6 @@ isn't set up. Each entry says what the Rust code does, where the behavior came f
 
 ## `pinewatch-assets`
 
-- **V21. Build configuration.** The shipped Windows client is assumed to be built with `WITH_NOREDIST` and without
-  `UNITY_EDITOR`, `DEVELOPMENT_BUILD` or `DEDICATED_SERVER`. The SDK project doesn't define `WITH_NOREDIST`, but it
-  replaces the plugins the shipped game has (for example the highlighter, `HighlightFallback`) only when it's
-  missing. It decides, among others, that the core `Bundles` location is added without checking that it exists,
-  that `Maps` isn't looked up in the Steam install, and that `MasterBundleConfig.getAssetBundlePath` is
-  `Path.Combine(directory, name)`. **Check:** the shipped `Assembly-CSharp.dll`'s IL for `Assets.LoadAllAssets`
-  (no `Directory.Exists` before the core location) and `MasterBundleConfig.getAssetBundlePath` (no
-  `Provider.steamAppInstallDirectory`). Pinewatch follows the Windows client on every host; the Linux client would
-  first look for `<name>_linux` bundles (`UNITY_STANDALONE_LINUX`).
 - **V23. Level discovery messages (gap).** The asset search needs only which `Maps` folders are levels:
   `ReadLevelInfo` accepts a folder whose `Level.dat` exists and reads, and Pinewatch logs `Discovered level ...` for
   it. Not yet produced: `Unable to parse <map>/Config.json! ...` and the level version error, which need the JSON
@@ -181,10 +139,24 @@ isn't set up. Each entry says what the Rust code does, where the behavior came f
 
 ## `pinewatch-binary`
 
-- **V30. `new byte[n]` with a negative `n` (check).** `Block.readByteArray` with `longBinaryData` passes a negative
-  `int` count straight to `new byte[count]`, which throws `OverflowException`. Pinewatch throws it with the default
-  constructor's message (`Arithmetic operation resulted in an overflow.`), as for other runtime exceptions, but
-  Mono's array allocation may set its own message. **Check:** the message of `new byte[-1]` on the game's runtime.
+## `pinewatch-json`
+
+- **V31. Json.NET's reader (gaps).** `JsonTextReader` with `JsonConvert`'s defaults gives the same tokens, values,
+  depths, paths, line positions and exceptions as the shipped `Newtonsoft.Json.dll` for every case of
+  `crates/pinewatch-json/tests/fixtures/reader-corpus.txt`. The 409 texts cover structure, comments, unquoted names,
+  numbers, strings and escapes, surrogates, dates, depth, errors and paths, line ends, Unicode whitespace,
+  constructors, and texts longer than the reader's 1,024-character buffer. The expected output comes from
+  `reference/checks/jsontokens.cs`, run on 2026-11-05 by the Unity Editor's Mono with copies of the shipped
+  `mscorlib.dll` and `Newtonsoft.Json.dll` (nothing in the reader is decided by the runtime). It includes the two
+  `ArgumentOutOfRangeException`s that escape the reader: `DateTime.AddDays` for 24:00 on 9999-12-31, and the
+  `DateTime` constructor for `/Date(n)/` out of range. Two gaps remain:
+  - **Local time.** A date with an offset (`+01:00`, or `/Date(n+0100)/`) is converted to the local time zone.
+    Time zones aren't ported, so the local zone is taken to be UTC: the token holds the UTC instant, marked
+    `Local`. The corpus compares local dates by their UTC instant, so it can't see this. The clamp at the ends of
+    the range (an offset past `DateTime.MaxValue` or below `MinValue`) also uses a zero local offset. **Check:**
+    port `TimeZoneInfo.Local`, or decide which zone Pinewatch reports.
+  - **Lone surrogates in messages and paths.** Exception messages and `path()` are Rust strings, so a lone
+    surrogate in a property name, or in a character a message quotes, becomes U+FFFD there; token values keep it.
 
 ## `pinewatch-kvt`
 
@@ -230,25 +202,10 @@ isn't set up. Each entry says what the Rust code does, where the behavior came f
 
 ## `pinewatch-dat`
 
-- **V17. Keys that differ only by case.** `DatDictionary` uses `StringComparer.OrdinalIgnoreCase`. In the source
-  (Unity mono `b8eb56f`, traced 2026-11-02):
-  - `OrdinalIgnoreCaseComparer.Equals` (corefx `StringComparer.cs`) is `string.Equals(x, y, OrdinalIgnoreCase)`
-    (`external/corefx-bugfix/.../String.Comparison.cs`): the lengths must match, then
-    `CompareInfo.CompareOrdinalIgnoreCase` folds `a`–`z` itself while both code units are ASCII and hands the rest
-    to Mono's `CompareStringOrdinalIgnoreCase` (`mcs/class/corlib/corefx/CompareInfo.cs`), which compares
-    `InvariantCulture.TextInfo.ToUpper` of each code unit. `GlobalizationMode.Invariant` is `false` in Mono.
-  - Its `GetHashCode` is `CompareInfo.GetIgnoreCaseHash`: `ToUpperInvariant` over the span (`TextInfo.ChangeCase`,
-    the same `ToUpper` for each code unit), then Marvin.
-
-  So two keys merge exactly when every code unit is equal after `ToUpperInvariant` (V3), which is what Pinewatch
-  does. Equal keys merge: the first spelling stays and the last value wins, with a `duplicate key` error.
-  **Check:** the same chain in the shipped IL (`OrdinalIgnoreCaseComparer`, `String.Equals(string, string,
-  StringComparison)`, `CompareInfo.CompareOrdinalIgnoreCase`, `CompareStringOrdinalIgnoreCase`, `GetIgnoreCaseHash`,
-  `MemoryExtensions.ToUpperInvariant`, `TextInfo.ChangeCase`, `TextInfo.ToUpper(char)`), and V3's tables.
 - **V19. Type names in `.dat` values (gap).** `ParseType` calls `Type.GetType(name, false, ignoreCase: true)`, which
   searches the calling assembly (`UnturnedDat.dll`) and `mscorlib.dll` unless the name says which assembly, and
   matches case-insensitively. Pinewatch asks a `TypeResolver`. Since M2c, `pinewatch_assets::AssetTypeResolver`
-  knows the 95 asset classes of the SDK: an assembly-qualified name with `Assembly-CSharp` (ignoring case, with any
+  knows the 96 asset classes of the SDK: an assembly-qualified name with `Assembly-CSharp` (ignoring case, with any
   further properties) and the full class name (ignoring ASCII case) resolve; an unqualified name doesn't, since
   `UnturnedDat.dll` and `mscorlib.dll` hold no asset class. Other types `Type.GetType` would find (non-asset classes,
   arrays, nested or generic types) aren't known, so a definition naming one gets `Unable to parse Metadata.Type`
@@ -290,3 +247,72 @@ Settled 2026-11-02 from the source, without the harness:
   entries (the default material, then 7 invalid references). So `materials[layer] = …` for layer 8 or more throws
   `List<T>`'s `ArgumentOutOfRangeException`, V7's message, as `more_than_eight_materials_throws` expects. Settled
   during the stabilization pass.
+
+Settled 2026-11-03 on the Windows PC, from the shipped assemblies (copies of `Unturned_Data/Managed`, game version
+3.26.3.13; the programs are in `reference/checks/`):
+
+- **V3. Unicode tables.** `char.ToUpperInvariant` and `char.ToLowerInvariant` of the shipped `mscorlib.dll`, run for
+  all 65,536 code units by the Mono of the Unity 2022.3.62f3 Editor (`MONO_PATH` set to the copied `Managed` folder,
+  so `typeof(object).Assembly.Location` is the game's corlib), give the FNV-1a checksums `whole_tables_match_monos`
+  pins (`0x48ed4531e9399927` and `0xb94ec82258b5db7b`) and change 973 code units each. `TextInfo.ToUpper` and
+  `ToLower` of `CultureInfo.InvariantCulture` and `string.ToUpperInvariant` give the same checksums. `IsWhiteSpace` is
+  true for exactly the 8 Latin-1 and 17 other code units `chars.rs` lists. The Editor's own corlib gives a
+  byte-identical dump. Pinewatch's tables were generated from Unity mono `b8eb56f` (V0); this run shows the shipped
+  build has the same tables. For M2f task 3 the run also recorded the Unicode categories, from two functions that
+  differ: the dump holds `char.GetUnicodeCategory` of every code unit (FNV-1a over the category numbers:
+  `0x5cd45c712e21a2e5`), and the program prints only the checksum of `CharUnicodeInfo.GetUnicodeCategory`
+  (`0x4280054dea7fbc49`), which corefx's `CharUnicodeInfoData` (mono/corefx `5b4edb9b`) reproduces. The two differ at
+  exactly five code units, U+00A7, U+00AA, U+00AD, U+00B6 and U+00BA, because below U+0100 `char` reads its own
+  table, `s_categoryForLatin1`. `tests/categories.rs` pins both checksums and the dump's `IsNumber` and
+  `IsLetterOrDigit`, which Json.NET's reader uses (M2f task 3).
+- **V17. Keys that differ only by case.** `DatDictionary` uses `StringComparer.OrdinalIgnoreCase`. The shipped
+  `mscorlib.dll`'s IL has the chain the source shows: `OrdinalIgnoreCaseComparer.Equals` is `String.Equals(x, y,
+  OrdinalIgnoreCase)`, whose `CompareOrdinalIgnoreCase` folds `a` to `z` while both code units are ASCII
+  (`GlobalizationMode.Invariant` is the constant `false`) and passes the rest to `CompareStringOrdinalIgnoreCase`,
+  which compares `TextInfo.ToUpper` of each; `GetHashCode` is `CompareInfo.GetIgnoreCaseHash`, Marvin over
+  `MemoryExtensions.ToUpperInvariant` of the key. Run on the shipped corlib for every code unit against its upper
+  case, lower case, ASCII case flip and neighbours (327,678 pairs), the comparer says equal exactly when the
+  `ToUpperInvariant` forms are equal, and equal strings hash alike. So two keys merge exactly when every code unit is
+  equal after V3's `ToUpperInvariant`, which is what Pinewatch does; the first spelling stays and the last value
+  wins, with a `duplicate key` error.
+- **V21. Build configuration.** The shipped Windows client is built with `WITH_NOREDIST` and without `UNITY_EDITOR`,
+  `DEVELOPMENT_BUILD` and `DEDICATED_SERVER`. In the shipped `Assembly-CSharp.dll`:
+  - `Assets.LoadAllAssets` (`<LoadAllAssets>d__118.MoveNext`) passes `Path.Combine(..., "Bundles")` straight to
+    `AddSearchLocation`, with no `Directory.Exists` (the `!WITH_NOREDIST` block), and calls
+    `Provider.initAutoSubscribeMaps` (the `WITH_NOREDIST` block) and `ResourceHash.Initialize` (`!DEDICATED_SERVER`).
+  - `MasterBundleConfig.getAssetBundlePath` is `Path.Combine(directoryPath, assetBundleName)` and `getHashFilePath`
+    is `getHashFileName(Path.Combine(directoryPath, assetBundleName))`, with no `core.masterbundle` case.
+  - `Level.ScanKnownLevels` lists `PathEx.Join(UnturnedPaths.RootDirectory, "Maps")` without a Steam fallback.
+  - `Provider.steamAppInstallDirectory`, which the SDK uses only inside `!WITH_NOREDIST` blocks, isn't in the
+    assembly at all.
+
+  So the core `Bundles` location is added without checking that it exists, `Maps` isn't looked up in the Steam
+  install, and the master bundle paths are `Path.Combine(directory, name)`, as Pinewatch does. Pinewatch follows the
+  Windows client on every host; the Linux client would first look for `<name>_linux` bundles
+  (`UNITY_STANDALONE_LINUX`).
+
+- **V2. Exception messages.** The texts below come from the shipped constructors and `ArgumentException.Message`
+  (IL-checked).
+
+  | Exception | Message |
+  |---|---|
+  | `NullReferenceException` | `Object reference not set to an instance of an object.` |
+  | `InvalidCastException` | `Specified cast is not valid.` |
+  | `OverflowException()` | `Arithmetic operation resulted in an overflow.` |
+  | `IndexOutOfRangeException` | `Index was outside the bounds of the array.` |
+  | `ArgumentOutOfRangeException(p)` | `Specified argument was out of the range of valid values.` + NewLine + `Parameter name: p` |
+  | `ArgumentNullException(p)` | `Value cannot be null.` + NewLine + `Parameter name: p` |
+  | `ArgumentException(message, p)` | the message + NewLine + `Parameter name: p`; nothing is added for a null or empty `p` |
+
+  Run on the game's own x64 runtime (`gamehost` with the shipped class libraries, `runtime_exceptions.cs`), the
+  runtime raises a null dereference with its own text, `Object reference not set to an instance of an object`
+  without the final period, in every form tried (a call, a field, an array, `throw null`, unboxing, a delegate, an
+  interface); the text is a C string in `mono-2.0-bdwgc.dll`, and `MonoException::null_reference` now uses it.
+  Failed casts and unboxing, array and string indexes, checked arithmetic and conversions and `int.MinValue / -1`
+  get the default constructor's message. `Environment.NewLine` is `"\r\n"`.
+- **V30. `new byte[n]` with a negative `n`.** On the game's x64 runtime, `newarr` with a negative `int` size (and
+  `new int[-1, 1]`) throws `OverflowException` with an empty message, whose `ToString()` is just
+  `System.OverflowException`; a negative `long` size fails in its conversion first, with the default message. The
+  32-bit runtime of the Unity Editor gives the default message instead, so only the game's runtime counts.
+  `Block.readByteArray` now throws `MonoException::negative_array_size`, and `UnturnedLog.exception` would log it
+  as `(empty exception message)`.

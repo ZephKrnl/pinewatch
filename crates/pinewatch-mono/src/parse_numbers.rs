@@ -13,6 +13,17 @@ pub(crate) const TREAT_AS_I2: i32 = 0x0800;
 pub(crate) const IS_TIGHT: i32 = 0x1000;
 pub(crate) const NO_SPACE: i32 = 0x2000;
 
+/// `Convert.ToInt64(value, fromBase)` (corefx `Convert.cs`): base 2, 8, 10 or 16, read with `IsTight`, so text after
+/// the digits is a `FormatException`. A `0x` prefix is accepted in base 16. Json.NET reads `0x` and octal numbers
+/// with it.
+pub fn convert_to_int64(value: &[u16], from_base: i32) -> Result<i64, MonoException> {
+    if from_base != 2 && from_base != 8 && from_base != 10 && from_base != 16 {
+        return Err(MonoException::argument(sr::ARG_INVALID_BASE, None));
+    }
+    let mut pos = 0;
+    string_to_long(value, from_base, IS_TIGHT, &mut pos)
+}
+
 /// The radix check at the top of both methods: -1 means "decimal unless a 0x prefix says hexadecimal".
 fn check_radix(radix: i32) -> Result<i32, MonoException> {
     let r = if radix == -1 { 10 } else { radix };

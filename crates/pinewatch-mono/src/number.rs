@@ -997,6 +997,9 @@ fn validate_parse_style_floating_point(style: NumberStyles) -> Result<(), MonoEx
 const DOUBLE_NAN_BITS: u64 = 0xFFF8_0000_0000_0000;
 const SINGLE_NAN_BITS: u32 = 0xFFC0_0000;
 
+/// `double.NaN`, with the bits the compiled constant holds (Rust's `f64::NAN` has the sign bit clear).
+pub const DOUBLE_NAN: f64 = f64::from_bits(DOUBLE_NAN_BITS);
+
 /// The fallback of `Double.TryParse` and `Single.TryParse` when number parsing fails: the input, trimmed with
 /// `char.IsWhiteSpace`, equal (ordinal) to the positive infinity, negative infinity or NaN symbol, in that order.
 fn special_symbol(value: &[u16], info: &NumberFormat) -> Option<SpecialValue> {

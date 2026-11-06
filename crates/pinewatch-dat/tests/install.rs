@@ -2,8 +2,9 @@
 //! worker uses, with metadata off and on (`AssetsWorker` sets `EnableMetadata` from `Assets.shouldParseMetadata`).
 //! The two modes can report different line numbers for the same file, as in the C#, so their errors aren't
 //! compared. The walk covers `Bundles/`, `Localization/`, and each map's root `.dat` files (the language files that
-//! `LevelInfo.getLocalization` reads through `ReadWrite.ReadDataWithoutHash`) and `Bundles/` folder. The install is
-//! only read. The test is skipped when no install is found.
+//! `LevelInfo.getLocalization` reads through `ReadWrite.ReadDataWithoutHash`) and `Bundles/` folder. It skips each
+//! map's `Level.dat`, which is binary (`Level.ReadLevelInfo` reads it with a `Block`). The install is only read. The
+//! test is skipped when no install is found.
 
 use pinewatch_dat::DatParser;
 use pinewatch_io::{InstallRoot, find_install};
@@ -26,8 +27,8 @@ fn dat_files(install: &InstallRoot, dir: &str, files: &mut Vec<String>) {
     }
 }
 
-/// Appends each map's root `.dat` files (for example `Maps/PEI/English.dat`) and the `.dat` and `.asset` files under
-/// its `Bundles/` folder, maps in name order.
+/// Appends each map's root `.dat` files (for example `Maps/PEI/English.dat`) except the binary `Level.dat`, and the
+/// `.dat` and `.asset` files under its `Bundles/` folder, maps in name order.
 fn map_files(install: &InstallRoot, files: &mut Vec<String>) {
     let entries = install.read_dir("Maps").unwrap_or_else(|error| panic!("Maps: {error}"));
     let mut maps: Vec<String> = entries.into_iter().filter_map(|name| name.into_string().ok()).collect();
@@ -46,7 +47,7 @@ fn map_files(install: &InstallRoot, files: &mut Vec<String>) {
                 if name == "Bundles" {
                     dat_files(install, &path, files);
                 }
-            } else if name.to_ascii_lowercase().ends_with(".dat") {
+            } else if name.to_ascii_lowercase().ends_with(".dat") && !name.eq_ignore_ascii_case("Level.dat") {
                 files.push(path);
             }
         }
@@ -75,9 +76,11 @@ fn walk_includes_map_language_files_and_map_bundles() {
         ("Localization/English/Menu.dat", "Key Value"),
         ("Maps/PEI/English.dat", "Name PEI"),
         ("Maps/PEI/Config.json", "{}"),
+        ("Maps/PEI/Level.dat", "binary, not parsed"),
         ("Maps/PEI/Level.hierarchy", ""),
         ("Maps/PEI/Bundles/Spawns/S.asset", "GUID 0"),
         ("Maps/PEI/Spawns/Players.dat", "binary, not parsed"),
+        ("Maps/Washington/LEVEL.DAT", "binary, not parsed"),
         ("Maps/Washington/Russian.dat", "Name W"),
     ] {
         let file = dir.join(path);

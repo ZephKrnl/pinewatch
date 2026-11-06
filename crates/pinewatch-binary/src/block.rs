@@ -107,7 +107,7 @@ impl Block {
     /// `readByteArray`: a `byte` count (an `int` one with `long_binary_data`, where 30000 or more gives an empty
     /// array), then the bytes. When they run past the end the copy is skipped, leaving zeros, and the step moves
     /// anyway. A negative `int` count passes the 30000 check, and `new byte[count]` throws `OverflowException`
-    /// (its message: V30).
+    /// with an empty message, as the game's runtime does (V30).
     pub fn read_byte_array(&mut self) -> Result<Vec<u8>, MonoException> {
         if self.step >= self.block.len() {
             return Ok(Vec::new());
@@ -117,7 +117,7 @@ impl Block {
             if count >= 30000 {
                 return Ok(Vec::new());
             }
-            usize::try_from(count).map_err(|_| MonoException::overflow())?
+            usize::try_from(count).map_err(|_| MonoException::negative_array_size())?
         } else {
             let count = usize::from(self.block[self.step]);
             self.step += 1;

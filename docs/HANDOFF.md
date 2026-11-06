@@ -1,27 +1,32 @@
 # Handoff
 
-The state of Pinewatch on 2026-11-02, updated during the third cloud session, written so work can resume from this
-file alone.
+The state of Pinewatch on 2026-11-03, updated on the Windows PC after the M2a integration, written so work can resume
+from this file alone.
 
 ## Where things stand
 
-- **Current branch:** `main-9m65p0`, the branch the cloud sessions were given, pushed to `origin`. It holds `main`
-  plus everything listed under "Done in the cloud sessions". **`main` was not fast-forwarded**: that work still needs
-  the Windows run (see "Exact next steps").
+- **Current branch:** `integration/m2a-m2c`, in the worktree `C:\pinewatch-integration` on the Windows PC. It holds
+  `main-9m65p0` (`main` plus everything under "Done in the cloud sessions") and "The M2a integration" below, which
+  brings in what `e14ac6d`, the PC's own fixes for the eight M2a review findings, had that the cloud's fixes didn't.
+  **`main` was not fast-forwarded** (see "Exact next steps").
 - **Done:** M1 (the bootable terrain viewer) and M2a (the `.dat` reader) are merged into `main`. On the Windows PC,
-  with the game installed, `cargo test --workspace` passes all 396 tests on `main` and skips none.
+  with the game installed, `cargo test --workspace` passes all 396 tests on `main` and skips none. On
+  `integration/m2a-m2c` it passes all 537 and skips none, `cargo clippy --workspace --all-targets` gives no warnings,
+  and `cargo xtask check-deps` passes for the 8 format crates.
 - **Linux (cloud):** on `main-9m65p0`, `cargo test --workspace` passes 534 tests (the install tests print
   `skipped: no Unturned install found`; the Windows-only test doesn't build), `cargo clippy --workspace --all-targets`
   gives no warnings, and `cargo xtask check-deps` passes for the 7 format crates. Setup a fresh Linux machine needs:
   `apt-get install libasound2-dev libudev-dev libwayland-dev libxkbcommon-dev` (pkg-config was present),
   `rustup component add clippy`, and `cargo fetch` (`check-deps` runs `cargo tree --target all --offline`).
 - **Remote:** `origin` is the private GitHub repository `ZephKrnl/pinewatch`. It stays private.
-- **Branches** (all pushed to `origin`):
+- **Branches** (pushed to `origin` unless marked local):
 
   | Branch | What it holds |
   |---|---|
   | `main` | M1, M2a, the M2a review fixes and the first handoff note (`480c1ca`) |
   | `main-9m65p0` | `main` plus the cloud sessions' work below |
+  | `integration/m2a-m2c` | Local, tracking `origin/main-9m65p0`: `main-9m65p0` plus the M2a integration |
+  | `pinewatch/development`, `opencode/development`, `claude/development`, `chatgpt/development` | All at `e14ac6d`, the PC's fixes for the eight M2a review findings; integrated by content, not merged |
   | `milestone/m2a-dat-reader` | The M2a work, merged into `main` by fast-forward (`b230803`) |
   | `milestone/m1-bootable` | The M1 work, merged into `main` (`ad11969`) |
   | `docs/step1-spec` | The step 1 design spec, merged into `main` (`a8c75f6`) |
@@ -70,7 +75,7 @@ file alone.
 | 7 | Message texts against the DLLs | `pinewatch-dat/tests/shipped_messages.rs`; its assembly half runs only with the game. |
 | 8 | Six clippy warnings | Fixed. |
 
-Finding 2 (V17) is now settled at source level (below); the IL check remains for the PC.
+Finding 2 (V17) is settled at source level (below) and, since the M2a integration, in the shipped IL.
 
 ### Mono's invariant casing tables (V3, V17)
 
@@ -94,12 +99,12 @@ on the branch. M2c comes before M2b because M2b needs the PC.
 | 4 Definitions and translations | Done | `read_location`/`read_items`: one parser per location, SHA-1, parser errors, `<Language>.dat` with English fallback |
 | 5 Master bundles | Done | `MasterBundleConfig` with its exceptions and version rules; bundle file hashed as a stream |
 | 6 Asset headers | Done | `AssetLoader`: master bundles, core bundle wait, `TryLoadFile`, `LoadFile` up to creating the asset (`AssetHeader`) |
-| 7 Asset types | Done | 95 asset classes, the 70 legacy keys, `GetTypeFriendlyName`, `AssetTypeResolver` for `Metadata.Type` |
+| 7 Asset types | Done | 96 asset classes (`WeatherAsset` added on the PC, see below), the 70 legacy keys, `GetTypeFriendlyName`, `AssetTypeResolver` for `Metadata.Type` |
 | 8 Localization | Done | `Local`: `format`, `format_or_null`, `format_or_empty`, the English fallback, `has` |
 | 9 Asset index | Done | `AssetMapping` (legacy tables, GUID dictionary, asset list, modification counter), `AddToMapping` with its messages, the 10 `FriendlyName` overrides, `ItemAsset.isPro`, `RedirectorAsset` |
 | 10 Asset references | Done | `AssetReference`, `ContentReference`, `MasterBundleReference`, `AudioReference` and their readers; `CachingAssetRef`, `CachingBcAssetRef` (cache, `IsReferenceTo`, `ToString`, parsers); `AssetLoader::find_legacy`; the rest of `UnturnedDatEx` except its writers |
 | 11 `LandscapeMaterialAsset`, holiday redirects | Done, inputs open | `LandscapeMaterialAsset` (`AssetHeader::landscape_material`), `EPhysicsMaterial`, `ERayMask`, `ENPCHoliday`, `holiday_redirect`; `AssetLoader::find` (redirectors) and `find_landscape_material`; `ClientAssetIntegrity`; `load_client_assets`; tiles read with `TileAssets` (holiday swap, known-missing check, `updatePrototypes`' requests). Open: the holiday inputs (V14) |
-| 12 The whole install | Done, not yet run | `pinewatch-assets/tests/install.rs` loads and indexes every location; asserts the core bundle, 5,000+ assets, item ID 1 with a friendly name, landscape materials and `Fallback_Green`. It skips without the install, so it has never run |
+| 12 The whole install | Done, run on the PC | `pinewatch-assets/tests/install.rs` loads and indexes every location; asserts the core bundle, 5,000+ assets, the Eaglefire (item 4; the plan said item 1, which no item has) with its friendly name, landscape materials and `Fallback_Green`. It skips without the install; its first run was on the PC on 2026-11-03 (see "The M2a integration") |
 
 Shared pieces added on the way: `MonoDictionary` (`Dictionary<K, V>`'s slot order, which the asset list depends
 on), `Guid`'s `D` format, and the `net_enum!` macro, which declares a ported C# enum from one member list. A
@@ -141,15 +146,48 @@ New entry: V30 (`new byte[negative]`'s message).
 The missing-heightmap test expects the `/` form on Linux, and the screenshot test checks an upper-case install path
 only where file systems ignore case. Neither changes production behavior.
 
+## The M2a integration (on the PC, 2026-11-03)
+
+`e14ac6d` fixed the same eight M2a review findings on the PC that the cloud sessions fixed on `main-9m65p0`. It is
+brought in by content, not merged (the history has no merge commits): where the cloud's version covers more, it
+stays (`TypeResolver`'s `Result` and its tests, the tokenizer case, V18 and its test, the README, the clippy fixes).
+What `e14ac6d` and the PC run added:
+
+- **V17 in the shipped IL.** The Unity Editor's `ikdasm` on a copy of `Unturned_Data\Managed\mscorlib.dll` shows the
+  chain V17 lists; only V3's tables remain open.
+- **Float bits from the shipped class library.** `corert_bits_from_the_shipped_class_library` pins 13 decimals
+  (3 quirks) and the overflow at `1.7976931348623159e308`, as the shipped `mscorlib.dll` parses them on the Unity
+  Editor's Mono. The same run gave every row of `corert_bits_from_an_independent_model` (V16).
+- **`value(null)`** is now among the messages `shipped_messages` builds through the port and finds among the
+  literals of `UnturnedDat.dll`.
+- **The install walk skips `Level.dat`.** The cloud's walk parsed each map's binary `Level.dat` as text; it now takes
+  only the language files (10 `English.dat` in the install).
+- **The assets install test's first run.** It looked up item 1, which no item has; the Eaglefire it meant is item 4
+  (`Bundles/Items/Guns/Eaglefire/Eaglefire.dat`), and the test now checks that its friendly name is `Eaglefire`. It
+  passes: 6,109 assets indexed and 40 landscape materials. The loader reports 5 asset errors, each logged as a
+  warning: `Unable to parse Metadata.Type` for the five `Bundles/Assets/Weather` assets (see "Unfinished work").
+
+The Editor's Mono runs the shipped class library when `MONO_PATH` points at a folder holding a copy of the game's
+`mscorlib.dll` (`typeof(object).Assembly.Location` confirms it), and its `mcs` and `ikdasm` work there too: a
+starting point for M2b's class-library checks.
+
+## On the PC after the integration (2026-11-03)
+
+- **M2c: `WeatherAsset`.** The type table missed `SDG.Unturned.WeatherAsset` because the SDK declares it
+  `public class /*Custom*/WeatherAsset : WeatherAssetBase`, with a comment between `class` and the name. An `ikdasm`
+  dump of the shipped `Assembly-CSharp.dll` (3.26.3.13) has 96 classes deriving from `Asset`; the table now has the
+  same 96, and their namespaces, abstract flags, `assetCategory` getters, item classes and `FriendlyName` overrides
+  all match it. Nothing in `WeatherAssetBase.PopulateAsset` or `WeatherAsset.PopulateAsset` can throw for the
+  shipped files (every value has a default), so the game indexes all five; their own fields wait with V28. The assets
+  install test now indexes 6,114 assets with no warnings, no errors and no reported asset errors, and fails if any
+  appear.
+
 ## Unfinished work
 
 ### 1. On the Windows PC (needs the game, Unity or the shipped DLLs)
 
-- **The Windows run** of everything on `main-9m65p0`, then fast-forwarding `main` (see "Exact next steps").
-- **Finding 2 / V17:** confirm in the IL of `Unturned_Data\Managed\mscorlib.dll` the chain V17 lists
-  (`OrdinalIgnoreCaseComparer`, `String.Equals(…, OrdinalIgnoreCase)`, `CompareInfo.CompareOrdinalIgnoreCase`,
-  `CompareStringOrdinalIgnoreCase`, `GetIgnoreCaseHash`, `MemoryExtensions.ToUpperInvariant`,
-  `TextInfo.ChangeCase`, `TextInfo.ToUpper(char)`).
+- **The Windows run:** the tests, clippy and `check-deps` pass on `integration/m2a-m2c` (see "Where things stand").
+  Still to do: run the app once, then fast-forward `main` (see "Exact next steps").
 - **V3:** confirm the shipped `TextInfoToUpperData`, `TextInfoToLowerData` and `CharUnicodeInfoData` equal the
   source (their field data in `mscorlib.dll`, or a harness dump of all 65,536 code units).
 - **V21:** confirm `WITH_NOREDIST` in the shipped `Assembly-CSharp.dll` (V21 names the methods to look at).
@@ -163,8 +201,7 @@ only where file systems ignore case. Neither changes production behavior.
 
 ### 2. In the cloud (no PC needed)
 
-- **M2c is written in full.** What remains of it is the PC run of its install tests (section 1).
-- **M2f tasks 2 to 7** (level info; the plan lists each).
+- **M2f tasks 3 to 7** (level info; the plan lists each).
 - Cloud disk is a fixed allowance: if linking the app fails with `signal 7 [Bus error]`, the disk is full of old
   app binaries (about 1.8 GB each); `cargo clean -p pinewatch` frees them.
 - Later plans: M2d (asset processor) and M2e (terrain materials) need Unity on the PC.
@@ -182,20 +219,13 @@ sessions anyway. No dev container exists. `CLAUDE.md` carries his rules into tho
 
 ## Exact next steps
 
-1. **On the Windows PC:** `git fetch`, check out `main-9m65p0`. Run `cargo test --workspace` (expect 535 tests,
-   none skipped: the Windows-only test, plus the install tests that skip on Linux run for the first time, among them
-   the map walk, `shipped_messages`' assembly half, `shipped_mscorlib` with the five new strings, and the assets
-   install test). If the level install test reports `Context "Landscape tile …" missing asset` warnings, look for the
-   same lines in the original game's `Logs/Client.log` after loading that map before changing anything: the game
-   warns too when a material is really missing. If a shipped-text test fails, compare with the DLL before changing
-   anything: the port must match it. Run `cargo clippy --workspace --all-targets` and `cargo xtask check-deps`. Run
-   the app once (`cargo run -p pinewatch --release`): it now loads every asset before the map, which has never run
-   on the real game; expect a slower start and the asset system's messages on stderr. Do the V17, V3 and V21 checks
-   above and update `docs/VERIFICATION.md`. Then fast-forward `main` and push it.
-2. **M2c is written in full** (tasks 1 to 12), but its install tests have never run: they skip without the game.
-   The PC run in step 1 is their first. **In the cloud:** M2f tasks 2 to 7, test first, one commit per task, after
-   the owner reviews the plan if he wants to. The active holiday (V14) waits for the provider. The next Unity plans,
-   M2d (asset processor) and M2e (terrain materials), need the PC.
+1. **On the Windows PC:** run the app once (`cargo run -p pinewatch --release`): it now loads every asset before
+   the map, which has never run on the real game; expect a slower start and the asset system's messages on stderr.
+   Do the V3 and V21 checks above and update `docs/VERIFICATION.md`. Then fast-forward `main` to
+   `integration/m2a-m2c` and push it.
+2. **In the cloud:** M2f tasks 3 to 7, test first, one commit
+   per task, after the owner reviews the plan if he wants to. The active holiday (V14) waits for the provider. The
+   next Unity plans, M2d (asset processor) and M2e (terrain materials), need the PC.
 3. **On the PC:** M2b: write its spec and plan, choosing between the Unity Editor in batch mode and the game's own
    Mono runtime for each check, then implement it test first and record what the comparisons show.
 

@@ -21,11 +21,13 @@ mod text;
 pub use boolean::try_parse_bool;
 pub use dictionary::MonoDictionary;
 pub use enums::{EnumInfo, EnumUnderlying, NetEnum, try_parse_enum};
-pub use exception::{ExceptionKind, MonoException, NEW_LINE};
+pub use exception::{ExceptionKind, MonoException, NEW_LINE, RUNTIME_NULL_REFERENCE};
 pub use guid::Guid;
 pub use net_string::NetString;
+pub use parse_numbers::convert_to_int64;
 pub use number::{
-    NumberFormat, NumberStyles, try_parse_f32, try_parse_f64, try_parse_i8, try_parse_i16, try_parse_i32, try_parse_i64,
+    DOUBLE_NAN, NumberFormat, NumberStyles, try_parse_f32, try_parse_f64, try_parse_i8, try_parse_i16, try_parse_i32,
+    try_parse_i64,
     try_parse_u8, try_parse_u16, try_parse_u32, try_parse_u64,
 };
 pub use text::{decode_stream_reader_default, utf8_get_string};

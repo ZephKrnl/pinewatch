@@ -1,0 +1,166 @@
+diff --git a/crates/pinewatch/src/terrain.rs b/crates/pinewatch/src/terrain.rs
+index d3bca3e..d97eae1 100644
+--- a/crates/pinewatch/src/terrain.rs
++++ b/crates/pinewatch/src/terrain.rs
+@@ -55,14 +55,57 @@ fn placeholder_color(tile: &LandscapeTile, row: usize, column: usize) -> [f32; 4
+     [rgb[0], rgb[1], rgb[2], 1.0]
+ }
+ 
+-/// One tile as a triangle mesh in Bevy space, facing up (+Y).
+-pub fn build_tile_mesh(tile: &LandscapeTile) -> Mesh {
++/// The landscape's height (normalized, as in the heightmap) at `row`, `column` counted from `tile`'s first sample.
++/// One step past the tile's edges the sample comes from whichever tile in `landscape` holds it (a diagonal one at the
++/// corners); `None` where the landscape ends.
++fn landscape_height(tile: &LandscapeTile, landscape: &[LandscapeTile], row: isize, column: isize) -> Option<f32> {
++    let last = (HEIGHTMAP_RESOLUTION - 1) as isize;
++    if (0..=last).contains(&row) && (0..=last).contains(&column) {
++        return Some(tile.heightmap[row as usize][column as usize]);
++    }
++    let global_row = tile.coord.y as isize * last + row;
++    let global_column = tile.coord.x as isize * last + column;
++    landscape.iter().find_map(|other| {
++        let row = global_row - other.coord.y as isize * last;
++        let column = global_column - other.coord.x as isize * last;
++        ((0..=last).contains(&row) && (0..=last).contains(&column))
++            .then(|| other.heightmap[row as usize][column as usize])
++    })
++}
++
++/// Unity-space normal at heightmap sample `(row, column)`, from central differences of the landscape's heights. Both
++/// tiles of a seam see the same samples there, so their shared vertices get the same normal and the seam doesn't
++/// show; where the landscape ends the difference is one-sided.
++fn tile_normal_unity(tile: &LandscapeTile, landscape: &[LandscapeTile], row: usize, column: usize) -> Vec3 {
++    let center = tile.heightmap[row][column];
++    let (row, column) = (row as isize, column as isize);
++    let height = |row, column| landscape_height(tile, landscape, row, column);
++    // Meters of height per meter between the samples before and after this one.
++    let slope = |before: Option<f32>, after: Option<f32>| {
++        let (low, high, cells) = match (before, after) {
++            (Some(before), Some(after)) => (before, after, 2.0),
++            (None, Some(after)) => (center, after, 1.0),
++            (Some(before), None) => (before, center, 1.0),
++            (None, None) => return 0.0,
++        };
++        (high - low) * TILE_HEIGHT / (cells * CELL)
++    };
++    let along_x = slope(height(row, column - 1), height(row, column + 1));
++    let along_z = slope(height(row - 1, column), height(row + 1, column));
++    Vec3::new(-along_x, 1.0, -along_z).normalize()
++}
++
++/// One tile as a triangle mesh in Bevy space, facing up (+Y). `landscape` holds the map's tiles (it may include
++/// `tile` itself): their samples next to `tile`'s edges give the edge vertices the same normals as in the neighbors.
++pub fn build_tile_mesh(tile: &LandscapeTile, landscape: &[LandscapeTile]) -> Mesh {
+     let n = HEIGHTMAP_RESOLUTION;
+     let mut positions = Vec::with_capacity(n * n);
++    let mut normals = Vec::with_capacity(n * n);
+     let mut colors = Vec::with_capacity(n * n);
+     for row in 0..n {
+         for column in 0..n {
+             positions.push(unity_to_bevy(tile_vertex_unity(tile, row, column)).to_array());
++            normals.push(unity_to_bevy(tile_normal_unity(tile, landscape, row, column).to_array()).to_array());
+             colors.push(placeholder_color(tile, row, column));
+         }
+     }
+@@ -81,9 +124,9 @@ pub fn build_tile_mesh(tile: &LandscapeTile) -> Mesh {
+ 
+     let mut mesh = Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::default());
+     mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
++    mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
+     mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, colors);
+     mesh.insert_indices(Indices::U32(indices));
+-    mesh.compute_smooth_normals();
+     mesh
+ }
+ 
+@@ -145,7 +188,7 @@ fn spawn_terrain(
+     });
+     for tile in &terrain.tiles {
+         commands.spawn((
+-            Mesh3d(meshes.add(build_tile_mesh(tile))),
++            Mesh3d(meshes.add(build_tile_mesh(tile, &terrain.tiles))),
+             MeshMaterial3d(material.clone()),
+             Transform::IDENTITY,
+             Name::new(format!("Terrain {}", tile.coord)),
+diff --git a/crates/pinewatch/tests/boot.rs b/crates/pinewatch/tests/boot.rs
+index 752de83..e6cef86 100644
+--- a/crates/pinewatch/tests/boot.rs
++++ b/crates/pinewatch/tests/boot.rs
+@@ -27,7 +27,7 @@ fn unity_to_bevy_negates_z() {
+ #[test]
+ fn flat_half_height_tile_sits_at_zero_and_spans_one_tile() {
+     let tile = LandscapeTile::new(LandscapeCoord { x: 1, y: -2 });
+-    let mesh = build_tile_mesh(&tile);
++    let mesh = build_tile_mesh(&tile, &[]);
+     let p = positions(&mesh);
+     assert_eq!(p.len(), 257 * 257);
+     assert!(p.iter().all(|v| v[1] == 0.0));
+@@ -42,7 +42,7 @@ fn heightmap_rows_follow_unity_z_and_columns_follow_unity_x() {
+     let mut tile = LandscapeTile::new(LandscapeCoord { x: 0, y: 0 });
+     tile.heightmap[3][5] = 1.0;
+     tile.heightmap[4][5] = 0.0;
+-    let mesh = build_tile_mesh(&tile);
++    let mesh = build_tile_mesh(&tile, &[]);
+     let p = positions(&mesh);
+     assert_eq!(p[3 * 257 + 5], [20.0, 1024.0, -12.0]);
+     assert_eq!(p[4 * 257 + 5], [20.0, -1024.0, -16.0]);
+@@ -50,10 +50,58 @@ fn heightmap_rows_follow_unity_z_and_columns_follow_unity_x() {
+ 
+ #[test]
+ fn flat_tile_normals_point_up() {
+-    let mesh = build_tile_mesh(&LandscapeTile::new(LandscapeCoord { x: 0, y: 0 }));
++    let mesh = build_tile_mesh(&LandscapeTile::new(LandscapeCoord { x: 0, y: 0 }), &[]);
+     assert!(normals(&mesh).iter().all(|n| (n[1] - 1.0).abs() < 1e-5 && n[0].abs() < 1e-5 && n[2].abs() < 1e-5));
+ }
+ 
++/// A tile whose heights (normalized, as in the heightmap) come from `height(unity_x, unity_z)`, so neighbors built
++/// from the same function share their edge samples exactly.
++fn tile_from(x: i32, y: i32, height: impl Fn(f32, f32) -> f32) -> LandscapeTile {
++    let mut tile = LandscapeTile::new(LandscapeCoord { x, y });
++    for (row, samples) in tile.heightmap.iter_mut().enumerate() {
++        for (column, sample) in samples.iter_mut().enumerate() {
++            *sample = height(x as f32 * 1024.0 + column as f32 * 4.0, y as f32 * 1024.0 + row as f32 * 4.0);
++        }
++    }
++    tile
++}
++
++fn hills(x: f32, z: f32) -> f32 {
++    0.5 + 0.01 * (x / 50.0).sin() * (z / 70.0).cos()
++}
++
++fn assert_same_normal(a: [f32; 3], b: [f32; 3], at: &str) {
++    let angle = Vec3::from(a).angle_between(Vec3::from(b));
++    assert!(angle < 1e-4, "{at}: {a:?} vs {b:?} ({angle} rad apart)");
++}
++
++#[test]
++fn neighboring_tiles_share_their_edge_normals() {
++    // Tile (0, 0), its east neighbor (1, 0) and its north neighbor (0, 1), with the same hills across both seams.
++    let landscape = vec![tile_from(0, 0, hills), tile_from(1, 0, hills), tile_from(0, 1, hills)];
++    let meshes: Vec<Mesh> = landscape.iter().map(|tile| build_tile_mesh(tile, &landscape)).collect();
++    let (origin, east, north) = (normals(&meshes[0]), normals(&meshes[1]), normals(&meshes[2]));
++    for i in 0..257 {
++        // Column 256 of (0, 0) is column 0 of (1, 0); row 256 of (0, 0) is row 0 of (0, 1).
++        assert_same_normal(origin[i * 257 + 256], east[i * 257], &format!("east seam, row {i}"));
++        assert_same_normal(origin[256 * 257 + i], north[i], &format!("north seam, column {i}"));
++    }
++}
++
++#[test]
++fn normals_lean_away_from_the_uphill_side() {
++    // Rising 1 m every 4 m toward Unity +x, then toward Unity +z (Bevy -z), up to the tile's edges.
++    let slope = 0.25;
++    let along_x = build_tile_mesh(&tile_from(0, 0, |x, _| 0.25 + x * slope / 2048.0), &[]);
++    let along_z = build_tile_mesh(&tile_from(0, 0, |_, z| 0.25 + z * slope / 2048.0), &[]);
++    let expected_x = Vec3::new(-slope, 1.0, 0.0).normalize().to_array();
++    let expected_z = Vec3::new(0.0, 1.0, slope).normalize().to_array();
++    for (i, (x, z)) in normals(&along_x).iter().zip(normals(&along_z)).enumerate() {
++        assert_same_normal(*x, expected_x, &format!("slope along x, vertex {i}"));
++        assert_same_normal(*z, expected_z, &format!("slope along z, vertex {i}"));
++    }
++}
++
+ fn args(list: &[&str]) -> Result<Cli, String> {
+     parse_args(list.iter().map(std::ffi::OsString::from))
+ }

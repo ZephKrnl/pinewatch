@@ -38,9 +38,17 @@ fn null_or_empty_parameter_name_adds_nothing() {
     assert_eq!(MonoException::argument_out_of_range_default().message, sr::ARG_ARGUMENT_OUT_OF_RANGE_EXCEPTION);
 }
 
+/// What the game's own x64 runtime (`MonoBleedingEdge/EmbedRuntime/mono-2.0-bdwgc.dll`, run with the shipped
+/// class libraries on 2026-11-03) raises: a null dereference gets the runtime's own text, without the period of
+/// `new NullReferenceException()`'s resource string, in every form tried (a call, a field, an array, `throw null`,
+/// unboxing, a delegate, an interface); `newarr` with a negative `int` size gets an `OverflowException` with an empty
+/// message (V30); casts, array indexes and checked arithmetic get their default constructor's message.
 #[test]
-fn runtime_exceptions_use_the_default_constructor_messages() {
-    assert_eq!(MonoException::null_reference().message, "Object reference not set to an instance of an object.");
+fn runtime_exceptions_have_the_game_runtimes_messages() {
+    assert_eq!(MonoException::null_reference().kind, ExceptionKind::NullReference);
+    assert_eq!(MonoException::null_reference().message, "Object reference not set to an instance of an object");
+    assert_eq!(MonoException::negative_array_size().kind, ExceptionKind::Overflow);
+    assert_eq!(MonoException::negative_array_size().message, "");
     assert_eq!(MonoException::invalid_cast().message, "Specified cast is not valid.");
     assert_eq!(MonoException::overflow().message, "Arithmetic operation resulted in an overflow.");
     assert_eq!(MonoException::index_out_of_range().message, "Index was outside the bounds of the array.");

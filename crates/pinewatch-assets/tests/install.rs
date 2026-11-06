@@ -1,7 +1,8 @@
 //! The whole install through M2c: every client search location searched and read, every definition loaded,
-//! populated as far as ported, and indexed. Asserts the core master bundle, plenty of assets in the index, the item
-//! with legacy ID 1 (the Eaglefire) with a friendly name, the landscape materials and the tiles' default one, and
-//! prints the messages. The install is only read. Skipped without an install.
+//! populated as far as ported, and indexed. Asserts the core master bundle, plenty of assets in the index, the
+//! Eaglefire under its legacy item ID 4 (`Bundles/Items/Guns/Eaglefire/Eaglefire.dat`; no item has ID 1) with its
+//! friendly name, the landscape materials and the tiles' default one, and prints the messages. The install is only
+//! read. Skipped without an install.
 
 use pinewatch_assets::{AssetLoader, AssetReference, Origins, client_search_locations, read_location};
 use pinewatch_io::{LogLevel, MemoryLog, find_install};
@@ -35,8 +36,8 @@ fn every_search_location_reads_and_loads() {
 
     let mapping = loader.mapping();
     assert!(mapping.asset_list().len() >= 5000, "only {} assets in the index", mapping.asset_list().len());
-    let eaglefire = mapping.find_legacy(pinewatch_assets::EAssetType::Item, 1).expect("no item with legacy ID 1");
-    assert!(!loader.headers[eaglefire].friendly_name.is_empty(), "item 1 has no friendly name");
+    let eaglefire = mapping.find_legacy(pinewatch_assets::EAssetType::Item, 4).expect("no item with legacy ID 4");
+    assert_eq!(loader.headers[eaglefire].friendly_name, "Eaglefire", "item 4's friendly name");
 
     let materials = loader.headers.iter().filter(|header| header.landscape_material.is_some()).count();
     assert!(materials > 0, "no landscape materials");
@@ -47,7 +48,7 @@ fn every_search_location_reads_and_loads() {
     let warnings = log.entries.iter().filter(|(level, _)| *level == LogLevel::Warn).count();
     let errors = log.entries.iter().filter(|(level, _)| *level == LogLevel::Error).count();
     eprintln!(
-        "{} locations, {} master bundles, {} assets ({} indexed, {materials} landscape materials), item 1 is {:?}, \
+        "{} locations, {} master bundles, {} assets ({} indexed, {materials} landscape materials), item 4 is {:?}, \
          {warnings} warnings, {errors} errors, {} reported asset errors",
         locations.len(),
         loader.master_bundles.len(),
@@ -59,4 +60,14 @@ fn every_search_location_reads_and_loads() {
     for (level, text) in log.entries.iter().filter(|(level, _)| *level != LogLevel::Info).take(20) {
         eprintln!("  [{level}] {text}");
     }
+
+    // `WeatherAssetBase.DEFAULT_RAIN` and `DEFAULT_SNOW`, two of the five `WeatherAsset`s in `Bundles/Assets/Weather`.
+    for guid in ["d73923f4416c43dfa5bc8b6234cf0257", "903577da2ecd4f5784b2f7aed8c300c1"] {
+        let guid = Guid::try_parse(Some(&NetString::from(guid))).unwrap();
+        let index = loader.find(guid, &mut find_log).unwrap_or_else(|| panic!("weather {guid} isn't indexed"));
+        assert_eq!(loader.headers[index].asset_type.name(), "WeatherAsset");
+    }
+    // Every definition's type resolves and nothing the port has reports a problem. The classes' own `PopulateAsset`
+    // messages aren't ported yet (V28), and an asset with errors in `Sandbox` would fail this, as the game reports it.
+    assert_eq!((warnings, errors, loader.errors.len()), (0, 0, 0), "the install reported problems (listed above)");
 }

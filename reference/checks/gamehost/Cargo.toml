@@ -1,0 +1,10 @@
+# Not a workspace member: a tool that runs .NET programs on the game's own Mono runtime (see ../README.md).
+[package]
+name = "gamehost"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[dependencies]

@@ -114,8 +114,9 @@ fn byte_arrays() {
     let (none, step) = long(&[1, 2]);
     assert!(none.unwrap().is_empty());
     assert_eq!(step, 0);
-    // A negative count passes the check, and `new byte[-1]` throws.
-    assert_eq!(long(&[0xFF, 0xFF, 0xFF, 0xFF, 1]).0.unwrap_err().kind, ExceptionKind::Overflow);
+    // A negative count passes the check, and `new byte[-1]` throws, with an empty message on the game's runtime.
+    let negative = long(&[0xFF, 0xFF, 0xFF, 0xFF, 1]).0.unwrap_err();
+    assert_eq!((negative.kind, negative.message.as_str()), (ExceptionKind::Overflow, ""));
 }
 
 #[test]

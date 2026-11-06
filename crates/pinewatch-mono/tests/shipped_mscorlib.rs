@@ -1,6 +1,7 @@
 //! Every resource string Pinewatch puts in an exception message is a string literal in the installed game's
-//! `mscorlib.dll`. This catches messages taken from source files that Unity's Mono doesn't compile.
-//! The install is only read. The test is skipped when no install is found.
+//! `mscorlib.dll`. This catches messages taken from source files that Unity's Mono doesn't compile. Messages the
+//! runtime itself creates are literals in the game's native runtime instead. The install is only read. The tests are
+//! skipped when no install is found.
 
 use std::collections::HashSet;
 
@@ -105,4 +106,18 @@ fn messages_from_uncompiled_sources_are_absent() {
     ] {
         assert!(!literals.contains(absent), "{absent:?} is a literal after all");
     }
+}
+
+/// The null dereference message (`MonoException::null_reference`) is a C string in the game's native runtime, not a
+/// `mscorlib.dll` resource.
+#[test]
+fn runtime_messages_are_c_strings_in_the_shipped_runtime() {
+    let Ok(install) = find_install(None) else {
+        eprintln!("skipped: no Unturned install found");
+        return;
+    };
+    let runtime = install.read("MonoBleedingEdge/EmbedRuntime/mono-2.0-bdwgc.dll").expect("the game's runtime");
+    let message = pinewatch_mono::MonoException::null_reference().message;
+    let c_string: Vec<u8> = message.bytes().chain([0]).collect();
+    assert!(runtime.windows(c_string.len()).any(|w| w == c_string), "{message:?} isn't a C string in the runtime");
 }

@@ -1,5 +1,9 @@
 # Personal Claude Code settings for this machine
 .claude/settings.local.json
+.claude/skills/graphify/
+.claude/CLAUDE.md
+.claude/*.graphify-bak
+.claude/**/*.bak
 
 # Build output, at any depth (cargo can create target/ folders inside crates)
 target/
@@ -12,3 +16,6 @@ target/
 
 # Execution ledgers for implementation plans
 /.superpowers/
+
+# Graphify's code graph and its caches, rebuilt locally with `graphify update .`
+graphify-out/

@@ -182,6 +182,28 @@ fn missing_guid_is_assigned_in_memory_only() {
 }
 
 /// `Activator.CreateInstance` on an abstract class throws `MissingMethodException` with Mono's odd message.
+/// The shape of the shipped `Bundles/Assets/Weather/DefaultRain.asset`. `WeatherAssetBase.PopulateAsset` and
+/// `WeatherAsset.PopulateAsset` can't throw for it (every value has a default), so the game indexes it; their own
+/// fields aren't ported yet (V28).
+#[test]
+fn weather_asset_is_created_and_indexed() {
+    let contents = format!(
+        "// Default has no overrides.\nMetadata\n{{\n\tGUID {GUID}\n\tType SDG.Unturned.WeatherAsset, Assembly-CSharp, \
+         Version=0.0.0.0, Culture=neutral, PublicKeyToken=null\n}}\nAsset\n{{\n\tComponent_Type \
+         SDG.Unturned.LegacyRainComponent, Assembly-CSharp, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null\n\t\
+         Volume_Mask 1\n\tFade_In_Duration 20\n}}"
+    );
+    let (_dir, _install, loader, log) = load(&[("Bundles/Assets/Weather/DefaultRain.asset", &contents)]);
+    assert_eq!(warnings(&log), Vec::<String>::new());
+    assert!(loader.errors.is_empty());
+    assert_eq!(loader.headers.len(), 1);
+    let header = &loader.headers[0];
+    assert_eq!(header.asset_type, AssetType::by_name("WeatherAsset").unwrap());
+    assert_eq!(header.friendly_name, "DefaultRain");
+    let guid = Guid::try_parse(Some(&pinewatch_mono::NetString::from(GUID))).unwrap();
+    assert_eq!(loader.find(guid, &mut MemoryLog::default()), Some(0));
+}
+
 #[test]
 fn abstract_type_cannot_be_constructed() {
     let contents =
@@ -204,7 +226,7 @@ fn bundle_override_path_flag_throws() {
     let path = full(&install, "Bundles/X/X.dat");
     assert_eq!(log.entries[log.entries.len() - 2..], [
         (LogLevel::Error, format!("Exception loading file {path}:")),
-        (LogLevel::Error, "Object reference not set to an instance of an object.".to_string()),
+        (LogLevel::Error, "Object reference not set to an instance of an object".to_string()),
     ]);
     assert!(loader.headers.is_empty());
 }
